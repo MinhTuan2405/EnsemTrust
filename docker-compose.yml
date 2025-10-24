@@ -1,0 +1,124 @@
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    env_file: ./.env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - ./data/postgres:/var/lib/postgresql
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    networks:
+      - ensemtrust_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+      - "-c"
+      - "max_wal_senders=10"
+      - "-c"
+      - "max_replication_slots=10"
+    restart: on-failure
+
+  dagster:
+    build:
+      context: .
+      dockerfile: Dockerfile.dagster
+    container_name: dagster
+    env_file: ./.env
+    environment:
+      - DAGSTER_ENV=${DAGSTER_ENV}
+      - DAGSTER_HOME=${DAGSTER_HOME}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=5432
+      - DATABASE_URL=${DATABASE_URL}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+      - AWS_S3_ENDPOINT=${AWS_S3_ENDPOINT}      
+    volumes:
+      - ./pipeline:/opt/dagster/dagster_home/dagster-project/pipeline
+      - ./data/dagster/compute_logs:/opt/dagster/dagster_home/dagster-project/compute_logs
+      - ./data/dagster/storage:/opt/dagster/dagster_home/dagster-project/storage
+      - ./data/dagster/local_artifact_storage:/opt/dagster/dagster_home/dagster-project/local_artifact_storage
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "${DAGSTER_PORT}:3000"
+    networks:
+      - ensemtrust_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    env_file: ./.env
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: server /data --console-address ":${MINIO_CONSOLE_PORT:-9001}" --address ":9000"
+    volumes:
+      - ./data/minio:/data
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    networks:
+      - ensemtrust_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: on-failure
+
+  mc:
+    image: minio/mc:latest
+    container_name: mc
+    env_file: ./.env
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh"]
+    command:
+      - -ec
+      - |
+        until mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin}; do echo 'waiting for minio...'; sleep 2; done
+        mc mb -p local/bronze || true
+        mc mb -p local/silver || true
+        mc mb -p local/gold || true
+        mc version enable local/landing || true
+        mc version enable local/bronze || true
+        mc version enable local/silver || true
+        mc version enable local/gold || true
+    networks:
+      - ensemtrust_network
+    restart: "no"
+
+  cloudbeaver:
+    image: dbeaver/cloudbeaver:latest
+    container_name: cloudbeaver
+    env_file: ./.env
+    volumes:
+      - ./data/cloudbeaver:/opt/cloudbeaver/workspace
+    ports:
+      - "${CLOUDBEAVER_PORT:-8978}:8978"
+    networks:
+      - ensemtrust_network
+    depends_on:
+      trino:
+        condition: service_healthy
+    restart: on-failure

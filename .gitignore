@@ -1,3 +1,5 @@
 # environment variables
 .env
 
+# ignore the volumes docker data
+data/
