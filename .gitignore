@@ -1,5 +1,6 @@
 # environment variables
 .env
+spark-defaults.conf
 
 # ignore the volumes docker data
 data/

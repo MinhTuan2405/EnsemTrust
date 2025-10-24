@@ -108,6 +108,43 @@ services:
       - ensemtrust_network
     restart: "no"
 
+  spark-master:
+    image: apache/spark:3.5.1-python3
+    hostname: spark-master
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+    env_file:
+      - ./.env
+    ports:
+      - "8080:8080"  # Spark Master Web UI
+      - "7077:7077"  
+    networks:
+      - ensemtrust_network
+    environment:
+      - SPARK_MASTER_HOST=spark-master
+      - SPARK_MASTER_PORT=7077
+    volumes:
+      - ./spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+    depends_on:
+      minio:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  spark-worker:
+    image: apache/spark:3.5.1-python3
+    hostname: spark-worker
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+    env_file:
+      - ./.env
+    depends_on:
+      - spark-master
+    environment:
+      - SPARK_MASTER_URL=spark://spark-master:7077
+    networks:
+      - ensemtrust_network
+    volumes:
+      - ./spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+
   cloudbeaver:
     image: dbeaver/cloudbeaver:latest
     container_name: cloudbeaver
