@@ -78,7 +78,7 @@ The system is divided into two main pipelines, both orchestrated by Dagster:
 
 ### Installation
 
-1.  Clone the repository:
+<!-- 1.  Clone the repository:
     ```bash
     git clone [YOUR_REPOSITORY_URL]
     cd [YOUR_PROJECT_DIRECTORY]
@@ -89,7 +89,7 @@ The system is divided into two main pipelines, both orchestrated by Dagster:
 3.  Build and run all services:
     ```bash
     docker compose up --build -d
-    ```
+    ``` -->
 
 ## Usage
 
