@@ -12,7 +12,6 @@ The system is designed as a modular, containerized application orchestrated by D
 
 ![Project Architecture Diagram](./image/architecture.png)
 
-*(Bạn hãy thay `image_26c3f9.png` bằng đường dẫn chính xác đến file ảnh kiến trúc của bạn trong thư mục dự án)*
 
 ## Key Features
 
@@ -85,7 +84,7 @@ The system is divided into two main pipelines, both orchestrated by Dagster:
     cd [YOUR_PROJECT_DIRECTORY]
     ```
 
-2.  (Optional) Configure environment variables. You may need to create a `.env` file based on a provided `.env.example`.
+2.  (Optional) Configure environment variables. You may need to create a `.env` file based on a provided `.template.env`.
 
 3.  Build and run all services:
     ```bash
