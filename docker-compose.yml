@@ -143,8 +143,8 @@ services:
     env_file:
       - ./.env
     depends_on:
-      - spark-master:
-          condition: service_completed_successfully
+      spark-master:
+          condition: service_healthy
     ports:
       - "8081:8081"
     environment:
@@ -233,7 +233,7 @@ services:
   
 
   hive-metastore:
-    image: apache/hive-metastore:4.0.0 
+    image: apache/hive:metastore:4.0.0 
     container_name: hive-metastore
     networks:
       - ensemtrust_network 
