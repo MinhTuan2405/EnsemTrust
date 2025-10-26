@@ -5,10 +5,11 @@ spark-defaults.conf
 # ignore the volumes docker data
 data/
 
-
+# pycache file 
 __pycache__/
 *.py[cod]
 
+# jars file
 *.jar
 
 build/
