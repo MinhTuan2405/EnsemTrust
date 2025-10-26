@@ -44,7 +44,7 @@ RUN poetry lock --no-interaction --no-ansi || true \
 
 
 # Copy requirements and config files
-COPY dagster.yaml workspace.yaml $DAGSTER_HOME
+COPY dagster.yaml $DAGSTER_HOME
 
 EXPOSE 3000
 

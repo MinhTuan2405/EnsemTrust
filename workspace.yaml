@@ -1,2 +1,10 @@
+# /opt/dagster/dagster_home/dagster-project/workspace.yaml
+# This file tells Dagster where to find your code definitions (assets, jobs, etc.)
+
 load_from:
-  -python_module: pipeline
+  # Each item in this list represents a "code location".
+  # Here, we're loading from a Python module named 'pipeline'.
+  - python_module:
+      module_name: pipeline # Assumes your code is in a 'pipeline' directory with an __init__.py
+      # You might need to specify an attribute if your Definitions object isn't named 'defs'
+      # attribute: my_definitions 

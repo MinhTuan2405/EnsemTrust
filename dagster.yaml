@@ -1,10 +1,10 @@
 storage:
   postgres:
     postgres_db:
-      username: dagster_dev
-      password: dagster_dev
+      username: admin
+      password: admin123
       hostname: postgres
-      db_name: dagster_db_dev
+      db_name: dagster
       port: 5432
 
 compute_logs:

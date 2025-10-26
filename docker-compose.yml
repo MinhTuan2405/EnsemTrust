@@ -50,6 +50,7 @@ services:
       - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
       - AWS_S3_ENDPOINT=${AWS_S3_ENDPOINT}      
     volumes:
+      - ./workspace.yaml:/opt/dagster/dagster_home/dagster-project/workspace.yaml:ro
       - ./pipeline:/opt/dagster/dagster_home/dagster-project/pipeline
       - ./data/dagster/compute_logs:/opt/dagster/dagster_home/dagster-project/compute_logs
       - ./data/dagster/storage:/opt/dagster/dagster_home/dagster-project/storage
@@ -215,10 +216,10 @@ services:
     restart: on-failure
 
   kafka-ui:
-    image: provectus/kafka-ui:latest
+    image: provectuslabs/kafka-ui:latest
     container_name: kafka-ui
     ports:
-      - "${KAFKA_UI_PORT:-8081}:8080" 
+      - "${KAFKA_UI_PORT:-8088}:8080" 
     networks:
       - ensemtrust_network
     depends_on:
@@ -230,35 +231,26 @@ services:
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
       DYNAMIC_CONFIG_ENABLED: "true"
     restart: on-failure
-  
+      
 
   hive-metastore:
-    image: apache/hive:metastore:4.0.0 
+    image: apache/hive:4.0.0-beta-1
     container_name: hive-metastore
-    networks:
-      - ensemtrust_network 
-    ports:
-      - "9083:9083" 
-    env_file: ./.env 
+    env_file:
+      - ./.env
     environment:
       SERVICE_NAME: metastore
-      DB_DRIVER: org.postgresql.Driver
-      SERVICE_PROPERTIES: |
-        javax.jdo.option.ConnectionURL=jdbc:postgresql://postgres:5432/${HIVE_METASTORE_DB}
-        javax.jdo.option.ConnectionDriverName=org.postgresql.Driver
-        javax.jdo.option.ConnectionUserName=${POSTGRES_USER}
-        javax.jdo.option.ConnectionPassword=${POSTGRES_PASSWORD}
-        datanucleus.autoCreateSchema=true
-        datanucleus.fixedDatastore=true
-
-        # Cấu hình để kết nối tới MinIO
-        fs.s3a.endpoint=http://minio:9000
-        fs.s3a.access.key=${MINIO_ROOT_USER}
-        fs.s3a.secret.key=${MINIO_ROOT_PASSWORD}
-        fs.s3a.path.style.access=true
-
-        # Đặt kho warehouse mặc định vào bucket 'gold' 
-        hive.metastore.warehouse.dir=s3a://gold/
+      DB_DRIVER: postgres
+      HIVE_METASTORE_URI : thrift://hive-metastore:9083
+      HIVE_AUX_JARS_PATH: /opt/hive/lib/postgresql-42.7.8.jar
+    ports:
+      - "9083:9083"
+    volumes:
+      - ./config/hive/hive-site.xml:/opt/hive/conf/hive-site.xml
+      - ./jars/hadoop-aws-3.3.6.jar:/opt/hive/lib/hadoop-aws-3.3.6.jar
+      - ./jars/postgresql-42.7.8.jar:/opt/hive/lib/postgresql-42.7.8.jar
+      - ./jars/aws-java-sdk-bundle-1.12.767.jar:/opt/hive/lib/aws-java-sdk-bundle-1.12.767.jar
+      - ./jars/hadoop-common-3.3.6.jar:/opt/hive/lib/hadoop-common-3.3.6.jar
     depends_on:
       postgres:
         condition: service_healthy
@@ -269,29 +261,40 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: on-failure
-
-  trino: 
-    image: trinodb/trino:449 
-    container_name: trino
     networks:
       - ensemtrust_network
-    ports:
-      - "${TRINO_PORT:-8090}:8080"
-    env_file: ./.env 
+    restart: on-failure
+
+
+
+  trino:
+    image: trinodb/trino:latest
+    container_name: trino
+    env_file: ./.env
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: admin123
     volumes:
       - ./config/trino:/etc/trino
       - ./data/trino:/data/trino
+      - ./jars/hadoop-aws-3.3.4.jar:/usr/lib/trino/plugin/delta-lake/hadoop-aws-3.3.4.jar:ro
+      - ./jars/aws-java-sdk-bundle-1.12.767.jar:/usr/lib/trino/plugin/delta-lake/aws-java-sdk-bundle-1.12.767.jar:ro
+    ports:
+      - "${TRINO_PORT:-8090}:8080"
+    networks:
+      - ensemtrust_network
     depends_on:
-      hive-metastore:
+      minio:
         condition: service_healthy
+      hive-metastore:
+        condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/v2/info"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 10s
+      retries: 30
     restart: on-failure
+
 
   cloudbeaver:
     image: dbeaver/cloudbeaver:latest
@@ -352,7 +355,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB} 
     volumes:
-      - ./streamlit_app:/app
+      - ./streamlit:/app
     depends_on:
       trino:
         condition: service_healthy

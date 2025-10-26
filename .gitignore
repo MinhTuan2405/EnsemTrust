@@ -4,3 +4,13 @@ spark-defaults.conf
 
 # ignore the volumes docker data
 data/
+
+
+__pycache__/
+*.py[cod]
+
+*.jar
+
+build/
+dist/
+*.log
