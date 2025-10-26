@@ -1,0 +1,4 @@
+streamlit 
+trino 
+psycopg2-binary
+pandas
