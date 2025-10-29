@@ -73,23 +73,146 @@ The system is divided into two main pipelines, both orchestrated by Dagster:
 
 ### Prerequisites
 
-* [Docker](https://www.docker.com/get-started)
-* [Docker Compose](https://docs.docker.com/compose/install/)
+Before you begin, ensure you have the following installed on your system:
 
-### Installation
+* **Docker** (version 20.10 or higher): [Download Docker](https://www.docker.com/get-started)
+* **Docker Compose** (version 2.0 or higher): [Install Docker Compose](https://docs.docker.com/compose/install/)
+* **Git**: For cloning the repository
+* **Minimum System Requirements:**
+  * RAM: 8GB (16GB recommended)
+  * Disk Space: 20GB free space
+  * CPU: 4 cores (8 cores recommended)
 
-<!-- 1.  Clone the repository:
-    ```bash
-    git clone [YOUR_REPOSITORY_URL]
-    cd [YOUR_PROJECT_DIRECTORY]
-    ```
+### Installation & Setup
 
-2.  (Optional) Configure environment variables. You may need to create a `.env` file based on a provided `.template.env`.
+Follow these steps to set up and run the project:
 
-3.  Build and run all services:
-    ```bash
-    docker compose up --build -d
-    ``` -->
+#### 1. Clone the Repository
+
+```bash
+git clone https://github.com/MinhTuan2405/EnsemTrust.git
+cd EnsemTrust
+```
+
+#### 2. Configure Environment Variables
+
+Create a `.env` file from the example template:
+
+**On Windows (PowerShell):**
+```powershell
+Copy-Item .example.env .env
+```
+
+**On Linux/macOS:**
+```bash
+cp .example.env .env
+```
+
+**Optional:** Edit the `.env` file to customize the configuration (ports, credentials, etc.). The default values are:
+- **PostgreSQL:** Port `5433`, User `admin`, Password `admin123`
+- **MinIO:** Port `9000` (API) and `9001` (Console), Credentials `admin/admin123`
+- **Dagster:** Port `3001`
+- **Trino:** Port `8090`
+- **Metabase:** Port `3007`
+- **Streamlit:** Port `8501`
+- **Kafka UI:** Port `8088`
+- **CloudBeaver:** Port `8978`
+
+#### 3. Download Required JAR Files
+
+The project requires specific JAR files for Hadoop, PostgreSQL, and AWS SDK integration. Run the appropriate script for your OS:
+
+**On Windows (PowerShell):**
+```powershell
+.\jardownloader.ps1
+```
+
+**On Linux/macOS:**
+```bash
+chmod +x jardownloader.sh
+./jardownloader.sh
+```
+
+This will download the following JARs to the `./jars` directory:
+- `hadoop-aws-3.3.6.jar`
+- `postgresql-42.7.8.jar`
+- `aws-java-sdk-bundle-1.12.262.jar`
+
+#### 4. Build and Start All Services
+
+Use Docker Compose to build and start all containers:
+
+**Option A: Using Make (if available):**
+```bash
+make build_run_all
+```
+
+**Option B: Using Docker Compose directly:**
+```bash
+docker compose up -d --build
+```
+
+This command will:
+- Build custom Docker images (Dagster, Streamlit)
+- Pull required images from Docker Hub
+- Create and start all containers in detached mode
+- Set up networks and volumes
+- Initialize databases and create MinIO buckets (bronze, silver, gold)
+
+#### 5. Verify Services are Running
+
+Check that all containers are running properly:
+
+```bash
+docker compose ps
+```
+
+You should see all services in the "Up" or "running" state. You can also check the logs:
+
+```bash
+# View logs for all services
+docker compose logs
+
+# View logs for a specific service
+docker compose logs dagster
+docker compose logs trino
+```
+
+#### 6. Wait for Services to Initialize
+
+Some services may take a few minutes to fully initialize:
+- **Trino**: Wait for the healthcheck to pass (~1-2 minutes)
+- **Metabase**: First startup may take 2-3 minutes to initialize the database
+- **Hive Metastore**: Should connect to PostgreSQL and initialize schemas
+
+You can monitor the initialization progress:
+
+```bash
+docker compose logs -f hive-metastore
+docker compose logs -f trino
+docker compose logs -f metabase
+```
+
+### Common Setup Commands
+
+The project includes a `Makefile` with convenient commands:
+
+```bash
+# Start all services
+make up
+
+# Stop all services
+make down
+
+# Restart all services
+make restart
+
+# Rebuild images
+make build
+
+# Build and run all services
+make build_run_all
+```
 
 ## Usage
 
