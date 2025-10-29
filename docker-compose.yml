@@ -276,8 +276,8 @@ services:
     volumes:
       - ./config/trino:/etc/trino
       - ./data/trino:/data/trino
-      - ./jars/hadoop-aws-3.3.4.jar:/usr/lib/trino/plugin/delta-lake/hadoop-aws-3.3.4.jar:ro
-      - ./jars/aws-java-sdk-bundle-1.12.767.jar:/usr/lib/trino/plugin/delta-lake/aws-java-sdk-bundle-1.12.767.jar:ro
+      - ./jars/hadoop-aws-3.3.6.jar:/usr/lib/trino/plugin/delta-lake/hadoop-aws-3.3.6.jar:ro
+      - ./jars/aws-java-sdk-bundle-1.12.262.jar:/usr/lib/trino/plugin/delta-lake/aws-java-sdk-bundle-1.12.262.jar:ro
     ports:
       - "${TRINO_PORT:-8090}:8080"
     networks:
