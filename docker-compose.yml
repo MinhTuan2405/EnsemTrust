@@ -234,38 +234,37 @@ services:
       
 
   hive-metastore:
-    image: apache/hive:4.0.0-beta-1
+    image: apache/hive:4.0.0
     container_name: hive-metastore
-    env_file:
-      - ./.env
+    env_file: ./.env
     environment:
-      SERVICE_NAME: metastore
-      DB_DRIVER: postgres
-      HIVE_METASTORE_URI : thrift://hive-metastore:9083
-      HIVE_AUX_JARS_PATH: /opt/hive/lib/postgresql-42.7.8.jar
+      - SERVICE_NAME=metastore
+      - DB_DRIVER=postgres
+      - SERVICE_OPTS=-Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://postgres:5432/${POSTGRES_DB} -Djavax.jdo.option.ConnectionUserName=${POSTGRES_USER} -Djavax.jdo.option.ConnectionPassword=${POSTGRES_PASSWORD}
+      # include both the versioned jar name and a common alias so the metastore finds the driver
+      - HIVE_AUX_JARS_PATH=/opt/hive/lib/postgresql-42.7.8.jar:/opt/hive/lib/postgresql-driver.jar:/opt/hive/lib/hadoop-aws.jar:/opt/hive/lib/aws-java-sdk-bundle.jar
+      - HADOOP_CLASSPATH=/opt/hive/lib/postgresql-42.7.8.jar:/opt/hive/lib/postgresql-driver.jar:/opt/hive/lib/hadoop-aws.jar:/opt/hive/lib/aws-java-sdk-bundle.jar
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-admin}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-admin123}
     ports:
       - "9083:9083"
     volumes:
-      - ./config/hive/hive-site.xml:/opt/hive/conf/hive-site.xml
-      - ./jars/hadoop-aws-3.3.6.jar:/opt/hive/lib/hadoop-aws-3.3.6.jar
-      - ./jars/postgresql-42.7.8.jar:/opt/hive/lib/postgresql-42.7.8.jar
-      - ./jars/aws-java-sdk-bundle-1.12.767.jar:/opt/hive/lib/aws-java-sdk-bundle-1.12.767.jar
-      - ./jars/hadoop-common-3.3.6.jar:/opt/hive/lib/hadoop-common-3.3.6.jar
+      # Mount JDBC and Hadoop AWS JAR files
+      # - ./jars/postgresql-42.7.8.jar:/opt/hive/lib/postgresql-42.7.8.jar:ro
+      # also mount as a generic driver name (some Hive images expect this filename)
+      - ./jars/postgresql-42.7.8.jar:/opt/hive/lib/postgresql-driver.jar:ro
+      - ./jars/hadoop-aws-3.3.6.jar:/opt/hive/lib/hadoop-aws.jar:ro
+      - ./jars/aws-java-sdk-bundle-1.12.262.jar:/opt/hive/lib/aws-java-sdk-bundle.jar:ro
+      # Mount hive configuration
+      - ./config/hive/hive-site.xml:/opt/hive/conf/hive-site.xml:ro
+    networks:
+      - ensemtrust_network
     depends_on:
       postgres:
         condition: service_healthy
       minio:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "9083"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - ensemtrust_network
     restart: on-failure
-
-
 
   trino:
     image: trinodb/trino:latest
