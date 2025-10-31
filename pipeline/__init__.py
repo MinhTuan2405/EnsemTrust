@@ -1,12 +1,36 @@
 from dagster import Definitions, load_assets_from_modules
 
-from pipeline.assets import bronze_layer, silver_layer, gold_layer
+from pipeline.assets import bronze_layer, gold_layer, silver_layer
 from pipeline.resources.kafka import kafka_resource
 from pipeline.resources.minio import minio_resource
 
 
 import os
 
+
+
+def _resolve_bool(env_value: str | None, default: bool = False) -> bool:
+    if env_value is None:
+        return default
+    return env_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+minio_endpoint = (
+    os.getenv("MINIO_ENDPOINT")
+    or os.getenv("AWS_S3_ENDPOINT")
+    or "minio:9000"
+)
+minio_access_key = (
+    os.getenv("MINIO_ROOT_USER")
+    or os.getenv("AWS_ACCESS_KEY_ID")
+    or "admin"
+)
+minio_secret_key = (
+    os.getenv("MINIO_ROOT_PASSWORD")
+    or os.getenv("AWS_SECRET_ACCESS_KEY")
+    or "admin123"
+)
+minio_secure = _resolve_bool(os.getenv("MINIO_SECURE"), default=False)
 
 
 bronze_assets = load_assets_from_modules([bronze_layer])
@@ -23,10 +47,10 @@ defs = Definitions(
             "bootstrap_servers": os.getenv("KAFKA_BROKER", "kafka:9092"),
         }),
         "minio_resource": minio_resource.configured({
-            "minio_endpoint": os.getenv("MINIO_ENDPOINT", "minio:9000"),
-            "minio_access_key": os.getenv("AWS_ACCESS_KEY_ID", "admin"),
-            "minio_secret_key": os.getenv("AWS_SECRET_ACCESS_KEY", "admin123"),
-            "secure": False,
+            "minio_endpoint": minio_endpoint,
+            "minio_access_key": minio_access_key,
+            "minio_secret_key": minio_secret_key,
+            "secure": minio_secure,
         }),
     },
 )
