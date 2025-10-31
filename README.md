@@ -218,7 +218,7 @@ make build_run_all
 
 Once all containers are running, you can access the different services:
 
-* **Dagster UI (Orchestration):** `http://localhost:3000`
+* **Dagster UI (Orchestration):** `http://localhost:3001`
 * **Streamlit App (Front-end):** `http://localhost:8501`
 * **Metabase (BI Dashboard):** `http://localhost:3030`
 * **MinIO Console (Data Lake):** `http://localhost:9001`
