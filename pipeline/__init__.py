@@ -1,19 +1,15 @@
 from dagster import Definitions, load_assets_from_modules
 
-from pipeline.assets import bronze_layer, gold_layer, silver_layer
-from pipeline.resources.kafka import kafka_resource
+from pipeline.assets.gold import gold_layer
+from pipeline.assets.bronze import bronze_layer
+from pipeline.assets.silver import silver_layer
 from pipeline.resources.minio import minio_resource
-
-
 import os
-
-
 
 def _resolve_bool(env_value: str | None, default: bool = False) -> bool:
     if env_value is None:
         return default
     return env_value.strip().lower() in {"1", "true", "yes", "on"}
-
 
 minio_endpoint = (
     os.getenv("MINIO_ENDPOINT")
@@ -43,9 +39,6 @@ all_assets = [*bronze_assets, *silver_assets, *gold_assets]
 defs = Definitions(
     assets=all_assets,
     resources={
-        "kafka_resource": kafka_resource.configured({
-            "bootstrap_servers": os.getenv("KAFKA_BROKER", "kafka:9092"),
-        }),
         "minio_resource": minio_resource.configured({
             "minio_endpoint": minio_endpoint,
             "minio_access_key": minio_access_key,
