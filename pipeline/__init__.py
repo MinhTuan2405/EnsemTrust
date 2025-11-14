@@ -4,6 +4,17 @@ from pipeline.assets.gold import gold_layer
 from pipeline.assets.bronze import bronze_layer
 from pipeline.assets.silver import silver_layer
 from pipeline.resources.minio import minio_resource
+
+# Import sensors và jobs
+from pipeline.sensors.file_sensor import (
+    landing_zone_file_sensor,
+    landing_zone_asset_sensor,
+)
+from pipeline.jobs.ingestion_job import (
+    ingest_file_job,
+    bronze_processing_job,
+)
+
 import os
 
 def _resolve_bool(env_value: str | None, default: bool = False) -> bool:
@@ -38,6 +49,14 @@ all_assets = [*bronze_assets, *silver_assets, *gold_assets]
 
 defs = Definitions(
     assets=all_assets,
+    sensors=[
+        landing_zone_asset_sensor,  # Sensor chính - trigger asset trực tiếp
+        # landing_zone_file_sensor,  # Alternative sensor - uncomment nếu muốn dùng
+    ],
+    jobs=[
+        ingest_file_job,
+        bronze_processing_job,
+    ],
     resources={
         "minio_resource": minio_resource.configured({
             "minio_endpoint": minio_endpoint,
