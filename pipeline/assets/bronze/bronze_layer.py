@@ -11,10 +11,7 @@ from datetime import datetime
     group_name='bronze_layer',
 )
 def ingest_new_file(context: AssetExecutionContext):
-    """
-    Ingest file từ landing zone bucket vào bronze layer.
-    File sẽ được copy từ landing zone sang bronze bucket.
-    """
+
     minio_client = context.resources.minio_resource
     
     landing_bucket = "landing"
@@ -22,14 +19,14 @@ def ingest_new_file(context: AssetExecutionContext):
     
     # Đảm bảo bronze bucket tồn tại
     if not minio_client.bucket_exists(bronze_bucket):
-        context.log.info(f"🪣 Tạo bronze bucket: {bronze_bucket}")
+        context.log.info(f"Tạo bronze bucket: {bronze_bucket}")
         minio_client.make_bucket(bronze_bucket)
     
     # Lấy danh sách files từ landing zone
     objects = list(minio_client.list_objects(landing_bucket, recursive=True))
     
     if not objects:
-        context.log.warning("⚠️ Không có file nào trong landing zone")
+        context.log.warning("Không có file nào trong landing zone")
         return Output(
             value={"files_processed": 0},
             metadata={"status": "no_files"}
@@ -44,7 +41,7 @@ def ingest_new_file(context: AssetExecutionContext):
         
         try:
             # Đọc file từ landing zone
-            context.log.info(f"📥 Đang đọc file: {file_name} ({file_size} bytes)")
+            context.log.info(f"Đang đọc file: {file_name} ({file_size} bytes)")
             response = minio_client.get_object(landing_bucket, file_name)
             file_data = response.read()
             response.close()
@@ -57,7 +54,7 @@ def ingest_new_file(context: AssetExecutionContext):
             new_file_name = f"{base_name}_{timestamp}.{extension}" if extension else f"{base_name}_{timestamp}"
             
             # Upload vào bronze bucket
-            context.log.info(f"📤 Đang upload vào bronze: {new_file_name}")
+            context.log.info(f"Đang upload vào bronze: {new_file_name}")
             minio_client.put_object(
                 bronze_bucket,
                 new_file_name,
@@ -72,14 +69,14 @@ def ingest_new_file(context: AssetExecutionContext):
             })
             total_size += file_size
             
-            context.log.info(f"✅ Đã ingest thành công: {file_name} -> {new_file_name}")
+            context.log.info(f"Đã ingest thành công: {file_name} -> {new_file_name}")
             
             # Xóa file khỏi landing zone sau khi ingest thành công
             minio_client.remove_object(landing_bucket, file_name)
-            context.log.info(f"🗑️  Đã xóa file khỏi landing zone: {file_name}")
+            context.log.info(f"Đã xóa file khỏi landing zone: {file_name}")
             
         except Exception as e:
-            context.log.error(f"❌ Lỗi khi xử lý file {file_name}: {str(e)}")
+            context.log.error(f"Lỗi khi xử lý file {file_name}: {str(e)}")
             continue
     
     # Tạo summary
@@ -88,7 +85,7 @@ def ingest_new_file(context: AssetExecutionContext):
         for f in processed_files
     ])
     
-    context.log.info(f"🎉 Hoàn thành! Đã ingest {len(processed_files)} file(s)")
+    context.log.info(f"Hoàn thành! Đã ingest {len(processed_files)} file(s)")
     
     return Output(
         value={
