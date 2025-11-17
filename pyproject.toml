@@ -33,7 +33,8 @@ dependencies = [
     "torch",
     "transformers",
     "sentence-transformers",
-    "xgboost"
+    "xgboost",
+    "pyspark (>=3.5.0,<4.0.0)"
 ]
 
 [build-system]

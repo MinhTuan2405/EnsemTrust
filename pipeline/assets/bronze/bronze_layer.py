@@ -47,11 +47,9 @@ def ingest_new_file(context: AssetExecutionContext):
             response.close()
             response.release_conn()
             
-            # Tạo tên file mới với timestamp để tránh ghi đè
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             base_name = file_name.rsplit('.', 1)[0] if '.' in file_name else file_name
             extension = file_name.rsplit('.', 1)[1] if '.' in file_name else ''
-            new_file_name = f"{base_name}_{timestamp}.{extension}" if extension else f"{base_name}_{timestamp}"
+            new_file_name = f"{base_name}.{extension}" if extension else f"{base_name}"
             
             # Upload vào bronze bucket
             context.log.info(f"Đang upload vào bronze: {new_file_name}")

@@ -7,7 +7,6 @@ from minio import Minio
 
 
 class MinioResourceWrapper:
-    """Expose a MinIO client along with helpers for Delta Lake storage options."""
 
     def __init__(self, *, endpoint: str, access_key: str, secret_key: str, secure: bool) -> None:
         self._secure = secure
@@ -36,12 +35,11 @@ class MinioResourceWrapper:
         scheme = "https" if self._secure else "http"
         return f"{scheme}://{endpoint}".rstrip("/")
 
-    def __getattr__(self, name):  # pragma: no cover - simple delegation helper
+    def __getattr__(self, name):  
         return getattr(self._client, name)
 
     @property
     def storage_options(self) -> dict:
-        """Storage options compatible with the deltalake Python connector."""
         options = {
             "AWS_ACCESS_KEY_ID": self._access_key,
             "AWS_SECRET_ACCESS_KEY": self._secret_key,

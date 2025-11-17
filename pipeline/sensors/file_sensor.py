@@ -109,5 +109,3 @@ def landing_zone_file_sensor(context: SensorEvaluationContext):
         run_requests=run_requests,
         cursor=new_cursor,
     )
-
-
