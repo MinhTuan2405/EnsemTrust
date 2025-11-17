@@ -1,6 +1,11 @@
 from dagster import asset, AssetExecutionContext, Output, MetadataValue, AssetIn
 from pipeline.utils.spark import create_spark_session
-from pyspark.sql.functions import lit
+from pyspark.sql.functions import lit, to_timestamp, coalesce, date_format, col, create_map, length
+from io import BytesIO
+import pyarrow.parquet as pq
+import pyarrow as pa
+
+from datetime import datetime
 
 @asset(
     description="Merge Fake và Real datasets, add label, remove duplicates",
@@ -9,86 +14,138 @@ from pyspark.sql.functions import lit
     group_name='silver_layer',
     ins={
         'load_fake_dataset': AssetIn('load_fake_dataset'),
-        'load_real_dataset': AssetIn('load_real_dataset'),
+        'load_true_dataset': AssetIn('load_true_dataset'),
     }
 )
 def transform_news_dataset(
     context: AssetExecutionContext,
     load_fake_dataset,
-    load_real_dataset
+    load_true_dataset
 ) -> Output[dict]:
     
-    if load_fake_dataset is None or load_real_dataset is None:
+    if load_fake_dataset is None or load_true_dataset is None:
         return Output(
             value={"status": "error", "message": "Missing upstream data"},
             metadata={"error": "upstream_data_missing"}
         )
     
-    spark = create_spark_session('transform_news_dataset')
-    context.log.info("SparkSession created")
+    timestamp = datetime.now()
+    app_name = f'transform_news_dataset_{timestamp.strftime("%Y%m%d_%H%M%S")}'
+    
+    spark = create_spark_session(app_name)
+    # Set legacy time parser for compatibility with various date formats
+    spark.conf.set("spark.sql.legacy.timeParserPolicy", "LEGACY")
+    context.log.info(f"SparkSession created: {app_name}")
 
     # Convert Pandas -> Spark
     fake_df = spark.createDataFrame(load_fake_dataset)
-    real_df = spark.createDataFrame(load_real_dataset)
+    real_df = spark.createDataFrame(load_true_dataset)
 
     # Add label column
     fake_df = fake_df.withColumn("label", lit(0))
     real_df = real_df.withColumn("label", lit(1))
 
     # Merge using Spark
-    combined_df = fake_df.unionByName(real_df)
+    df = fake_df.unionByName(real_df)
 
     # Remove duplicates
-    combined_df = combined_df.dropDuplicates()
+    df = df.dropDuplicates()
 
-    # Stats
-    total_records = combined_df.count()
-    fake_count = combined_df.filter("label == 0").count()
-    real_count = combined_df.filter("label == 1").count()
+    # Parse date column - try multiple formats    
+    df = df.withColumn(
+        "date_parsed",
+        coalesce(
+            to_timestamp("date", "MMM d, yyyy"),   # "Dec 4, 2017"
+            to_timestamp("date", "MMMM d, yyyy"),  # "January 21, 2016"
+            to_timestamp("date", "yyyy-MM-dd"),
+            to_timestamp("date", "dd/MM/yyyy"),
+            to_timestamp("date", "MM-dd-yyyy"),
+            to_timestamp("date", "M/d/yyyy"),
+            to_timestamp("date", "d-MMM-yy")
+        )
+    )
+    
+    # Replace original date column
+    df = df.withColumn("date", col("date_parsed")).drop("date_parsed")
 
-    context.log.info(f"Total records after deduplicate: {total_records}")
-    context.log.info(f"Fake count: {fake_count}")
-    context.log.info(f"Real count: {real_count}")
+    # Extract month and year
+    df = df.withColumn("month", date_format(col("date"), "MM"))
+    df = df.withColumn("year", date_format(col("date"), "yyyy"))
+    df = df.withColumn("year_month", date_format(col("date"), "yyyy-MM"))
 
-    # Save to MinIO
+    mapping = {
+        "Government News": "Politics",
+        "politics": "Politics",
+        "politicsNews": "Politics",
+        "left-news": "Politics",
+        "worldnews": "World",
+        "Middle-east": "World",
+        "US_News": "US",
+        "News": "General"
+    }
+
+    mapping_expr = create_map([lit(x) for kv in mapping.items() for x in kv])
+
+    df = df.withColumn(
+        "subject",
+        coalesce(mapping_expr[col("subject")], col("subject"))
+    )
+
+    # add length of the title and text
+    df = df.withColumn("text_length", length(col("text")))
+    df = df.withColumn("title_length", length(col("title")))
+
+    context.log.info("Transformation complete, converting to Pandas for MinIO upload...")
+    
+    # Convert back to Pandas for reliable MinIO upload
+    result_df = df.toPandas()
+    
+    spark.stop()
+    context.log.info("SparkSession stopped")
+
+    # Save to MinIO using pandas/pyarrow
     minio_client = context.resources.minio_resource
     silver_bucket = 'silver'
 
     if not minio_client.bucket_exists(silver_bucket):
         minio_client.make_bucket(silver_bucket)
 
-    output_path = f"s3a://{silver_bucket}/combined_news.parquet"
+    output_file = "dataset.parquet"
 
     try:
-        combined_df.coalesce(1).write.mode("overwrite").parquet(output_path)
+        # Convert to Parquet in memory
+        table = pa.Table.from_pandas(result_df)
+        parquet_buffer = BytesIO()
+        pq.write_table(table, parquet_buffer)
+        parquet_buffer.seek(0)
+        
+        # Upload to MinIO
+        file_size = len(parquet_buffer.getvalue())
+        minio_client.put_object(
+            silver_bucket,
+            output_file,
+            parquet_buffer,
+            length=file_size,
+            content_type='application/octet-stream'
+        )
 
-        # Fetch file size
-        objects = list(minio_client.list_objects(silver_bucket, recursive=True))
-        parquet_files = [obj for obj in objects if obj.object_name.endswith('.parquet')]
-        total_size = sum(obj.size for obj in parquet_files)
-
-        spark.stop()
+        context.log.info(f"Saved {output_file} to MinIO silver bucket ({file_size} bytes)")
 
         return Output(
             value={
                 "status": "success",
-                "output_path": output_path,
-                "total_records": total_records,
-                "fake_count": fake_count,
-                "real_count": real_count,
-                "file_size_bytes": total_size,
+                "output_path": f"s3a://{silver_bucket}/{output_file}",
+                "file_size_bytes": file_size,
+                "records": len(result_df)
             },
             metadata={
-                "total_records": total_records,
-                "fake_count": fake_count,
-                "real_count": real_count,
-                "fake_percentage": MetadataValue.float(fake_count / total_records * 100),
-                "real_percentage": MetadataValue.float(real_count / total_records * 100),
-                "output_path": output_path,
-                "file_size_bytes": total_size,
+                "output_path": f"s3a://{silver_bucket}/{output_file}",
+                "file_size_bytes": file_size,
+                "records": len(result_df),
+                "columns": result_df.columns.tolist()
             }
         )
 
     except Exception as e:
-        spark.stop()
+        context.log.error(f"Error saving to MinIO: {str(e)}")
         raise e

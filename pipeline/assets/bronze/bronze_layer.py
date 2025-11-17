@@ -69,9 +69,9 @@ def ingest_new_file(context: AssetExecutionContext):
             
             context.log.info(f"Đã ingest thành công: {file_name} -> {new_file_name}")
             
-            # Xóa file khỏi landing zone sau khi ingest thành công
-            minio_client.remove_object(landing_bucket, file_name)
-            context.log.info(f"Đã xóa file khỏi landing zone: {file_name}")
+            # Không xóa file khỏi landing zone - giữ lại để backup
+            # minio_client.remove_object(landing_bucket, file_name)
+            # context.log.info(f"Đã xóa file khỏi landing zone: {file_name}")
             
         except Exception as e:
             context.log.error(f"Lỗi khi xử lý file {file_name}: {str(e)}")

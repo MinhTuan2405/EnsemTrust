@@ -12,8 +12,9 @@ import json
 @sensor(
     name="landing_zone_file_sensor",
     description="Theo dõi landing zone trong MinIO và trigger ingest job khi có file mới",
+    job_name="ingest_file_from_landing",
     default_status=DefaultSensorStatus.RUNNING,
-    minimum_interval_seconds=15,  # Check mỗi 30 giây
+    minimum_interval_seconds=15,  # Check mỗi 15 giây
     required_resource_keys={"minio_resource"},
 )
 def landing_zone_file_sensor(context: SensorEvaluationContext):

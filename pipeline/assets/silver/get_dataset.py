@@ -3,6 +3,7 @@ import pandas as pd
 from io import BytesIO
 
 def create_loading_dataset_asset(file_name: str):
+    origin_file = file_name
 
     file_name = file_name.replace ('.csv', '').lower ()
     @asset(
@@ -22,12 +23,12 @@ def create_loading_dataset_asset(file_name: str):
             return
 
         try:
-            file_obj = minio_client.get_object(default_bucket, file_name)
+            file_obj = minio_client.get_object(default_bucket, origin_file)
         except Exception as e:
-            context.log.error(f"Không tìm thấy file {file_name} trong bucket {default_bucket}: {e}")
+            context.log.error(f"Không tìm thấy file {origin_file} trong bucket {default_bucket}: {e}")
             return
 
-        df = pd.read_parquet(BytesIO(file_obj.read()))
+        df = pd.read_csv(BytesIO(file_obj.read()))
 
         file_obj.close()
         file_obj.release_conn()
@@ -42,4 +43,4 @@ def create_loading_dataset_asset(file_name: str):
     return load_dataset
 
 fake_dataset_asset = create_loading_dataset_asset ('Fake.csv')
-real_dataset_asset = create_loading_dataset_asset ('Real.csv')
+real_dataset_asset = create_loading_dataset_asset ('True.csv')
