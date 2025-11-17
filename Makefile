@@ -12,3 +12,6 @@ restart:
 
 build_run_all:
 	docker compose up -d --build
+
+upload:
+	powershell -ExecutionPolicy Bypass -File ./git_upload.ps1
