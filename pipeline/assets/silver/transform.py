@@ -7,7 +7,7 @@ from datetime import datetime
 from pyspark.sql import SparkSession
 import pandas as pd
 import os
-
+from pipeline.utils.spark import create_spark_session
 
 @asset(
     description="Merge Fake và Real datasets, thêm labels và lưu thành Parquet sử dụng Spark",
@@ -15,23 +15,16 @@ import os
     required_resource_keys={'minio_resource'},
     group_name='silver_layer',
     ins={
-        'load_Fake.csv': AssetIn('load_Fake.csv'),
-        'load_Real.csv': AssetIn('load_Real.csv'),
+        'load_Fake.csv': AssetIn('load_fake_dataset'),
+        'load_Real.csv': AssetIn('load_real_dataset'),
     }
 )
 def combined_news_dataset(
     context: AssetExecutionContext,
     **kwargs
-) -> Output[dict]:
-    """
-    Đọc Fake.csv và Real.csv từ upstream assets,
-    thêm labels (0: fake, 1: real),
-    merge lại và lưu thành file Parquet duy nhất sử dụng Spark
-    """
-    
+) -> Output[dict]: 
     minio_client = context.resources.minio_resource
     
-    # Lấy data từ upstream assets
     fake_df = kwargs.get('load_Fake.csv')
     real_df = kwargs.get('load_Real.csv')
     
@@ -64,21 +57,7 @@ def combined_news_dataset(
     context.log.info(f"   - Real: {real_count} ({real_count/total_records*100:.1f}%)")
     
     # Tạo SparkSession đơn giản
-    spark = (
-        SparkSession.builder
-            .appName("EnsemTrust-Combined-Dataset")
-            .master("spark://spark-master:7077")
-            .config("spark.hadoop.fs.s3a.endpoint", f"http://minio:9000")
-            .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ROOT_USER", "admin"))
-            .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_ROOT_PASSWORD", "admin123"))
-            .config("spark.hadoop.fs.s3a.path.style.access", "true")
-            .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-            .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
-            .getOrCreate()
-    )
-    
-    spark.conf.set("spark.sql.execution.arrow.pyspark.enabled", "true")
-    spark.conf.set("spark.sql.execution.arrow.pyspark.fallback.enabled", "true")
+    spark = create_spark_session ('Union file')
     
     context.log.info("✅ SparkSession created")
     

@@ -3,12 +3,14 @@ import pandas as pd
 from io import BytesIO
 
 def create_loading_dataset_asset(file_name: str):
+
+    file_name = file_name.replace ('.csv', '').lower ()
     @asset(
         description="Load file from bronze layer to the silver layer then clean them",
         compute_kind='Spark',
         required_resource_keys={'minio_resource'},
         group_name='silver_layer',
-        name=f'load_{file_name}'
+        name=f'load_{file_name}_dataset'
     )
     def load_dataset(context: AssetExecutionContext):
         minio_client = context.resources.minio_resource
