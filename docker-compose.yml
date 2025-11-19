@@ -118,17 +118,29 @@ services:
     image: spark-master:latest 
     container_name: spark-master
     hostname: spark-master
-    # SỬA Ở ĐÂY: Thêm /opt/spark/
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master --host spark-master
     env_file:
       - .env
+    environment:
+      - PYSPARK_PYTHON=python3.10
+      - PYSPARK_DRIVER_PYTHON=python3.10
     ports:
       - "7077:7077"
       - "8082:8080"
     volumes:
-      - ./spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+      - ./spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
     networks:
       - ensemtrust_network
+    depends_on:
+      minio:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   spark-worker-1:
     image: spark-master:latest 
@@ -136,14 +148,19 @@ services:
     hostname: spark-worker-1
     env_file:
       - .env
+    environment:
+      - PYSPARK_PYTHON=python3.10
+      - PYSPARK_DRIVER_PYTHON=python3.10
     depends_on:
-      - spark-master
-    # SỬA Ở ĐÂY: Thêm /opt/spark/
+      spark-master:
+        condition: service_healthy
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     ports:
       - "8081:8081" 
     networks:
       - ensemtrust_network
+    volumes:
+      - ./spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
 
   spark-worker-2:
     image: spark-master:latest 
@@ -151,14 +168,19 @@ services:
     hostname: spark-worker-2
     env_file:
       - .env
+    environment:
+      - PYSPARK_PYTHON=python3.10
+      - PYSPARK_DRIVER_PYTHON=python3.10
     depends_on:
-      - spark-master
-    # SỬA Ở ĐÂY: Thêm /opt/spark/
+      spark-master:
+        condition: service_healthy
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     ports:
       - "8083:8081" 
     networks:
       - ensemtrust_network
+    volumes:
+      - ./spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
 
 
   # zookeeper:

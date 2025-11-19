@@ -2,12 +2,22 @@ FROM spark:3.5.7-scala2.12-java11-ubuntu
 
 USER root
 
+# Install Python 3.10
 RUN set -ex; \
     apt-get update; \
-    apt-get install -y python3 python3-pip; \
-    apt-get install -y r-base r-base-dev; \
+    apt-get install -y software-properties-common wget; \
+    add-apt-repository ppa:deadsnakes/ppa; \
+    apt-get update; \
+    apt-get install -y python3.10 python3.10-dev python3.10-distutils; \
+    wget https://bootstrap.pypa.io/get-pip.py; \
+    python3.10 get-pip.py; \
+    rm get-pip.py; \
+    python3.10 -m pip install --no-cache-dir pyspark==3.5.1 numpy pandas pyarrow; \
+    apt-get clean; \
     rm -rf /var/lib/apt/lists/*
 
-ENV R_HOME=/usr/lib/R
+# Set Python 3.10 as default for PySpark
+ENV PYSPARK_PYTHON=python3.10
+ENV PYSPARK_DRIVER_PYTHON=python3.10
 
 USER spark
