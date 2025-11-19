@@ -112,7 +112,9 @@ services:
     restart: "no"
 
   spark-master:
-    image: apache/spark:3.5.1-python3
+    build:
+      context: .
+      dockerfile: Dockerfile.spark
     hostname: spark-master
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
     env_file:
@@ -125,6 +127,8 @@ services:
     environment:
       - SPARK_MASTER_HOST=spark-master
       - SPARK_MASTER_PORT=7077
+      - PYSPARK_PYTHON=python3.10
+      - PYSPARK_DRIVER_PYTHON=python3.10
     volumes:
       - ./spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
     depends_on:
@@ -140,7 +144,9 @@ services:
       start_period: 10s
 
   spark-worker:
-    image: apache/spark:3.5.1-python3
+    build:
+      context: .
+      dockerfile: Dockerfile.spark
     hostname: spark-worker
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
     env_file:
@@ -152,6 +158,8 @@ services:
       - "8081:8081"
     environment:
       - SPARK_MASTER_URL=spark://spark-master:7077
+      - PYSPARK_PYTHON=python3.10
+      - PYSPARK_DRIVER_PYTHON=python3.10
     networks:
       - ensemtrust_network
     volumes:

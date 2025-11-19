@@ -1,0 +1,47 @@
+FROM apache/spark:3.5.1-python3
+
+USER root
+
+# Install dependencies for building Python
+RUN apt-get update && \
+    apt-get install -y \
+    wget \
+    build-essential \
+    libssl-dev \
+    zlib1g-dev \
+    libncurses5-dev \
+    libncursesw5-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libgdbm-dev \
+    libdb5.3-dev \
+    libbz2-dev \
+    libexpat1-dev \
+    liblzma-dev \
+    libffi-dev \
+    uuid-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Download and compile Python 3.10
+RUN wget https://www.python.org/ftp/python/3.10.14/Python-3.10.14.tgz && \
+    tar -xzf Python-3.10.14.tgz && \
+    cd Python-3.10.14 && \
+    ./configure --enable-optimizations --prefix=/usr/local && \
+    make -j$(nproc) && \
+    make altinstall && \
+    cd .. && \
+    rm -rf Python-3.10.14 Python-3.10.14.tgz
+
+# Install pip for Python 3.10
+RUN curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10
+
+# Install Python packages for PySpark
+RUN python3.10 -m pip install --no-cache-dir numpy pandas pyarrow
+
+# Set Python 3.10 as the default for PySpark
+ENV PYSPARK_PYTHON=python3.10
+ENV PYSPARK_DRIVER_PYTHON=python3.10
+
+# Switch back to spark user (default UID 185 in apache/spark image)
+USER 185

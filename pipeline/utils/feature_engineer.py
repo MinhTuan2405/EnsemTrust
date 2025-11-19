@@ -4,19 +4,30 @@ import textstat
 from sentence_transformers import SentenceTransformer
 import torch
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.decomposition import TruncatedSVD
+
 
 import os
 from dotenv import load_dotenv
 load_dotenv ()
 
-max_feat = os.getenv ('TFIDF_MAX_FEATURES', 5000)
+# Configuration from environment variables
+TFIDF_MAX_FEATURES = int(os.getenv('TFIDF_MAX_FEATURES', 5000))
+SVD_COMPONENTS = int(os.getenv('SVD_COMPONENTS', 300))
+RANDOM_STATE = int(os.getenv('RANDOM_STATE', 42))
 
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
+# Factory functions to create fresh instances (avoid state pollution)
+def create_tfidf_vectorizer():
+    """Create a new TF-IDF vectorizer instance"""
+    return TfidfVectorizer(max_features=TFIDF_MAX_FEATURES, ngram_range=(1, 2))
 
-tfidf = TfidfVectorizer(max_features=max_feat, ngram_range=(1,2))
+def create_svd_transformer():
+    """Create a new SVD transformer instance"""
+    return TruncatedSVD(n_components=SVD_COMPONENTS, random_state=RANDOM_STATE)
 
 
 def handcrafted_features(texts):
@@ -65,3 +76,8 @@ def encode_texts_st(texts, batch_size=32):
         normalize_embeddings=False
     )
     return emb
+
+
+def combine(emb, tfidf_svd, hand):
+    # emb: (N, E), tfidf_svd: (N, S), hand: DataFrame (N, H)
+    return np.hstack([emb, tfidf_svd, hand.values])

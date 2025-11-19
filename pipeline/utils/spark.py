@@ -9,6 +9,11 @@ def create_spark_session(app_name):
     Create a SparkSession that connects to remote Spark cluster.
     This requires PySpark to be installed in the Dagster container.
     """
+    
+    # Get Python executable path
+    import sys
+    python_path = sys.executable
+    
     spark = (
         SparkSession.builder
         .appName(app_name)
@@ -19,6 +24,9 @@ def create_spark_session(app_name):
         .config("spark.driver.bindAddress", "0.0.0.0")
         .config("spark.driver.memory", "2g")
         .config("spark.executor.memory", "2g")
+        # Fix Python version mismatch - force workers to use same Python as driver
+        .config("spark.pyspark.python", python_path)
+        .config("spark.pyspark.driver.python", python_path)
         .config("spark.hadoop.fs.s3a.endpoint", "http://minio:9000")
         .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ROOT_USER", "admin"))
         .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_ROOT_PASSWORD", "admin123"))
