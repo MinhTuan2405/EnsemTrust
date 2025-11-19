@@ -1,4 +1,7 @@
-streamlit 
-trino 
+streamlit
+trino
 psycopg2-binary
 pandas
+numpy
+scikit-learn
+minio
