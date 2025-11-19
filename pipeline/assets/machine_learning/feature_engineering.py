@@ -17,7 +17,7 @@ from sklearn.model_selection import train_test_split
 def split_data(context: AssetExecutionContext, load_data_from_silver):
 
     timestamp = datetime.now()
-    app_name = f'feature_engineering_{timestamp.strftime("%Y%m%d_%H%M%S")}'
+    app_name = f'split_data{timestamp.strftime("%Y%m%d_%H%M%S")}'
 
     spark = create_spark_session(app_name)
     context.log.info(f'SparkSession created: {app_name}')
@@ -33,19 +33,20 @@ def split_data(context: AssetExecutionContext, load_data_from_silver):
     dedup_count = df.count()
     context.log.info(f"After deduplication: {dedup_count} (removed {initial_count - dedup_count})")
 
-    # Drop time series columns
-    df = df.drop("date", "month", "year", "year_month")
-    context.log.info("Dropped time series columns: date, month, year, year_month")
 
-    # Create content = title + text, replace null by ''
+    # Create content = title + text + subject, replace null by ''
     df = df.withColumn(
         "content",
-        concat_ws(" ", coalesce(col("title"), lit("")), coalesce(col("text"), lit("")))
+        concat_ws(" ", 
+                  coalesce(col("title"), lit("")), 
+                  coalesce(col("text"), lit("")),
+                  coalesce(col("subject"), lit(""))
+        )
     )
-    context.log.info("Created 'content' column by concatenating title and text")
+    context.log.info("Created 'content' column by concatenating title, text and subject")
 
     # Select final columns for ML
-    df = df.select("content", "subject", "label", "text_length", "title_length")
+    df = df.select("content", "label")
     
     # Show sample
     context.log.info("Sample data after feature engineering:")
@@ -58,21 +59,22 @@ def split_data(context: AssetExecutionContext, load_data_from_silver):
     context.log.info("SparkSession stopped, converted to Pandas DataFrame")
     
     # Split data: 60% train, 20% validation, 20% test, stratify by label
+    # Only use 'content' column as feature 
     X = pd_df['content']
     y = pd_df['label']
     
-    # First split: 60% train, 40% temp (val + test)
-    X_train, X_temp, y_train, y_temp = train_test_split(
+    # First split: 80% temp (train+val), 20% test
+    X_temp, X_test, y_temp, y_test = train_test_split(
         X, y, 
-        test_size=0.4, 
+        test_size=0.2, 
         random_state=42, 
         stratify=y
     )
     
-    # Second split: 50% of temp for validation, 50% for test (20% each of total)
-    X_val, X_test, y_val, y_test = train_test_split(
+    # Second split: 75% train, 25% val (from temp = 60% and 20% of total)
+    X_train, X_val, y_train, y_val = train_test_split(
         X_temp, y_temp, 
-        test_size=0.5, 
+        test_size=0.25, 
         random_state=42, 
         stratify=y_temp
     )
@@ -80,6 +82,7 @@ def split_data(context: AssetExecutionContext, load_data_from_silver):
     context.log.info(f"Train set: {len(X_train)} samples ({len(X_train)/len(pd_df)*100:.1f}%)")
     context.log.info(f"Validation set: {len(X_val)} samples ({len(X_val)/len(pd_df)*100:.1f}%)")
     context.log.info(f"Test set: {len(X_test)} samples ({len(X_test)/len(pd_df)*100:.1f}%)")
+    context.log.info(f"Shapes: train={X_train.shape}, val={X_val.shape}, test={X_test.shape}")
     context.log.info(f"Train label distribution:\n{y_train.value_counts()}")
     context.log.info(f"Validation label distribution:\n{y_val.value_counts()}")
     context.log.info(f"Test label distribution:\n{y_test.value_counts()}")
@@ -109,7 +112,7 @@ def split_data(context: AssetExecutionContext, load_data_from_silver):
             "train_split": 0.6,
             "validation_split": 0.2,
             "test_split": 0.2,
-            "features": X.columns.tolist(),
+            "feature": "content",
             "train_fake": int((y_train == 0).sum()),
             "train_real": int((y_train == 1).sum()),
             "val_fake": int((y_val == 0).sum()),
