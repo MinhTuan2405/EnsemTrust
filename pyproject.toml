@@ -34,7 +34,7 @@ dependencies = [
     "transformers",
     "sentence-transformers",
     "xgboost",
-    "pyspark==3.5.1"
+    "pyspark==3.5.7"
 ]
 
 [build-system]

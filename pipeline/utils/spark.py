@@ -14,23 +14,23 @@ def create_spark_session(app_name):
         SparkSession.builder
         .appName(app_name)
         .master("spark://spark-master:7077")
-        .config("spark.submit.deployMode", "client")
-        .config("spark.driver.host", "dagster")
-        .config("spark.driver.bindAddress", "0.0.0.0")
-        .config("spark.driver.memory", "2g")
-        .config("spark.executor.memory", "2g")
-        # Python version
         .config("spark.pyspark.python", "python3.10")
         .config("spark.pyspark.driver.python", "python3.10")
-        # MinIO S3 config
+        # JAR packages for S3/MinIO access
+        .config("spark.jars.packages", "org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262,io.delta:delta-spark_2.12:3.1.0")
+        # S3/MinIO configuration
         .config("spark.hadoop.fs.s3a.endpoint", "http://minio:9000")
-        .config("spark.hadoop.fs.s3a.access.key", os.getenv("MINIO_ROOT_USER", "admin"))
-        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("MINIO_ROOT_PASSWORD", "admin123"))
         .config("spark.hadoop.fs.s3a.path.style.access", "true")
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
         .config("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
-        .config("spark.jars.packages", "org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262")
+        .config("spark.hadoop.fs.s3a.access.key", os.getenv("AWS_ACCESS_KEY_ID", "admin"))
+        .config("spark.hadoop.fs.s3a.secret.key", os.getenv("AWS_SECRET_ACCESS_KEY", "admin123"))
+        # Delta Lake
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+        .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+        # Driver configuration
+        .config("spark.driver.host", "dagster")
+        .config("spark.driver.memory", "2g")
         .getOrCreate()
     )
     

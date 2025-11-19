@@ -35,6 +35,7 @@ def transform_news_dataset(
     spark = create_spark_session(app_name)
     # Set legacy time parser for compatibility with various date formats
     spark.conf.set("spark.sql.legacy.timeParserPolicy", "LEGACY")
+
     context.log.info(f"SparkSession created: {app_name}")
 
     # Convert Pandas -> Spark

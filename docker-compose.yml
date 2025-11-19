@@ -121,9 +121,6 @@ services:
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master --host spark-master
     env_file:
       - .env
-    environment:
-      - PYSPARK_PYTHON=python3.10
-      - PYSPARK_DRIVER_PYTHON=python3.10
     ports:
       - "7077:7077"
       - "8082:8080"
@@ -148,9 +145,6 @@ services:
     hostname: spark-worker-1
     env_file:
       - .env
-    environment:
-      - PYSPARK_PYTHON=python3.10
-      - PYSPARK_DRIVER_PYTHON=python3.10
     depends_on:
       spark-master:
         condition: service_healthy
@@ -168,9 +162,6 @@ services:
     hostname: spark-worker-2
     env_file:
       - .env
-    environment:
-      - PYSPARK_PYTHON=python3.10
-      - PYSPARK_DRIVER_PYTHON=python3.10
     depends_on:
       spark-master:
         condition: service_healthy

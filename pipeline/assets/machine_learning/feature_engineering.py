@@ -27,6 +27,10 @@ def split_data(context: AssetExecutionContext, load_data_from_silver):
     spark.conf.set("spark.sql.execution.arrow.pyspark.enabled", "false")
     context.log.info(f'SparkSession created: {app_name}')
 
+    # Tắt Arrow để tránh lỗi ArrowInvalid khi toPandas
+    spark.conf.set("spark.sql.execution.arrow.pyspark.enabled", "false")
+    spark.conf.set("spark.sql.execution.arrow.pyspark.fallback.enabled", "true")
+
     # Convert Pandas to Spark DataFrame
     df = spark.createDataFrame(load_data_from_silver)
     
@@ -245,14 +249,13 @@ def handcrafted_feature_engineering(context: AssetExecutionContext,
         context.log.error("One or more input datasets are None")
         return None
     
-    context.log.info('Starting handcrafted feature engineering')
-    context.log.info(f'Train shape: {load_train_data.shape}, Val shape: {load_validation_data.shape}, Test shape: {load_test_data.shape}')
-    
     # Extract content text from each split (as Series)
     X_train = load_train_data['content']
     X_val = load_validation_data['content']
     X_test = load_test_data['content']
     
+    context.log.info('Starting handcrafted feature engineering')
+    context.log.info(f'Train shape: {X_train.shape}, Val shape: {X_val.shape}, Test shape: {X_test.shape}')
     context.log.info(f'Extracted text content: train={len(X_train)}, val={len(X_val)}, test={len(X_test)}')
     
     # Compute handcrafted features (pass Series directly)
@@ -352,7 +355,7 @@ def tfidf_svd_feature_engineering(context: AssetExecutionContext,
     # Step 3: Save fitted transformers to MinIO
     context.log.info('Step 3: Saving fitted transformers to MinIO')
     
-    minio_client = context.resources.minio_resource.get_client()
+    minio_client = context.resources.minio_resource
     bucket_name = "models"
     
     # Ensure bucket exists
