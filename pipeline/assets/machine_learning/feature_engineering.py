@@ -272,18 +272,15 @@ def handcrafted_feature_engineering(context: AssetExecutionContext,
         value={
             'train': {
                 'X': X_train_hand,
-                'y': y_train,
-                'text': X_train
+                'y': y_train
             },
             'validation': {
                 'X': X_val_hand,
-                'y': y_val,
-                'text': X_val
+                'y': y_val
             },
             'test': {
                 'X': X_test_hand,
-                'y': y_test,
-                'text': X_test
+                'y': y_test
             }
         },
         metadata={
@@ -402,18 +399,15 @@ def tfidf_svd_feature_engineering(context: AssetExecutionContext,
         value={
             'train': {
                 'X': X_train_tfidf_svd,
-                'y': y_train,
-                'text': X_train
+                'y': y_train
             },
             'validation': {
                 'X': X_val_tfidf_svd,
-                'y': y_val,
-                'text': X_val
+                'y': y_val
             },
             'test': {
                 'X': X_test_tfidf_svd,
-                'y': y_test,
-                'text': X_test
+                'y': y_test
             }
         },
         metadata={
@@ -479,18 +473,15 @@ def sentence_transformer_feature_engineering(context: AssetExecutionContext,
         value={
             'train': {
                 'X': X_train_st,
-                'y': y_train,
-                'text': X_train
+                'y': y_train
             },
             'validation': {
                 'X': X_val_st,
-                'y': y_val,
-                'text': X_val
+                'y': y_val
             },
             'test': {
                 'X': X_test_st,
-                'y': y_test,
-                'text': X_test
+                'y': y_test
             }
         },
         metadata={
@@ -539,14 +530,10 @@ def combine_features(context: AssetExecutionContext,
     X_val_st = sentence_transformer_feature_engineering['validation']['X']
     X_test_st = sentence_transformer_feature_engineering['test']['X']
     
-    # Get labels and text (same across all feature engineering assets)
+    # Get labels (same across all feature engineering assets)
     y_train = handcrafted_feature_engineering['train']['y']
     y_val = handcrafted_feature_engineering['validation']['y']
     y_test = handcrafted_feature_engineering['test']['y']
-    
-    X_train_text = handcrafted_feature_engineering['train']['text']
-    X_val_text = handcrafted_feature_engineering['validation']['text']
-    X_test_text = handcrafted_feature_engineering['test']['text']
     
     context.log.info(f'Feature shapes before combination:')
     context.log.info(f'  Handcrafted: train={X_train_hand.shape}, val={X_val_hand.shape}, test={X_test_hand.shape}')
@@ -566,18 +553,15 @@ def combine_features(context: AssetExecutionContext,
         value={
             'train': {
                 'X': X_train_combined,
-                'y': y_train,
-                'text': X_train_text
+                'y': y_train
             },
             'validation': {
                 'X': X_val_combined,
-                'y': y_val,
-                'text': X_val_text
+                'y': y_val
             },
             'test': {
                 'X': X_test_combined,
-                'y': y_test,
-                'text': X_test_text
+                'y': y_test
             }
         },
         metadata={
