@@ -33,7 +33,6 @@ dependencies = [
     "torch",
     "transformers",
     "sentence-transformers",
-    "xgboost",
     "pyspark==3.5.7",
     "lightgbm",
     "python-dotenv"
