@@ -379,6 +379,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB} 
     volumes:
       - ./streamlit:/app
+      - ./pipeline/utils:/app/pipeline/utils
     depends_on:
       trino:
         condition: service_healthy

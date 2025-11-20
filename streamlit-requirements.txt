@@ -5,3 +5,12 @@ pandas
 numpy
 scikit-learn
 minio
+tqdm
+textstat
+torch
+transformers
+sentence-transformers
+lightgbm
+python-dotenv
+scipy
+pyarrow

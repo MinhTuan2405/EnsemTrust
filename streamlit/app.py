@@ -6,8 +6,8 @@ from minio import Minio
 import os
 import sys
 
-# Add pipeline path to sys.path to import from pipeline.utils
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+# Add parent directory to import pipeline package
+sys.path.insert(0, '/app')
 
 from pipeline.utils.models import predict_fake_news
 
@@ -61,46 +61,105 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. LOGIC XỬ LÝ (Giữ nguyên logic cũ của bạn) ---
-def analyze_news(text):
-    # [MÔ PHỎNG] Thay dòng này bằng code gọi model thật của bạn sau này
-    prob = random.uniform(0.0, 1.0) 
+# --- 3. KHỞI TẠO MINIO CLIENT VÀ LOAD MODEL ---
+@st.cache_resource
+def load_model_from_minio(model_name="best_model.pkl"):
+    """Load trained model from MinIO bucket.
     
-    # Quy tắc đánh giá
-    if 0 <= prob < 0.2:
-        label = "FAKE NEWS (Tin giả)"
-        color = "#ff4b4b" # Đỏ
-        icon = "🚨"
-        msg = "Cảnh báo: Nội dung này có dấu hiệu bịa đặt cao."
-    elif 0.2 <= prob < 0.4:
-        label = "KHẢ NĂNG CAO LÀ TIN GIẢ"
-        color = "#ff9800" # Cam
-        icon = "⚠️"
-        msg = "Độ tin cậy thấp. Cần kiểm tra kỹ nguồn tin."
-    elif 0.4 <= prob < 0.5:
-        label = "NGHI NGỜ"
-        color = "#fbc02d" # Vàng
-        icon = "🤔"
-        msg = "Thông tin chưa rõ ràng, cần đối chiếu thêm."
-    elif 0.5 <= prob < 0.6:
-        label = "TRUNG LẬP"
-        color = "#9e9e9e" # Xám
-        icon = "⚖️"
-        msg = "Chưa đủ dữ kiện để kết luận."
-    elif 0.6 <= prob < 0.8:
-        label = "THIÊN VỀ TIN THẬT"
-        color = "#42a5f5" # Xanh dương
-        icon = "✅"
-        msg = "Thông tin có cơ sở, khá đáng tin."
-    else:
-        label = "REAL NEWS (Tin thật)"
-        color = "#4caf50" # Xanh lá
-        icon = "🛡️"
-        msg = "Độ xác thực rất cao. Tin chuẩn."
+    Args:
+        model_name: Name of the pickle file in models/model/ path.
+    
+    Returns:
+        Loaded sklearn model or None if failed.
+    """
+    try:
+        # MinIO connection config (adjust if needed)
+        minio_client = Minio(
+            endpoint=os.getenv("MINIO_ENDPOINT", "minio:9000"),
+            access_key=os.getenv("MINIO_ACCESS_KEY", "admin"),
+            secret_key=os.getenv("MINIO_SECRET_KEY", "admin123"),
+            secure=False
+        )
+        
+        bucket_name = "models"
+        object_path = f"model/{model_name}"
+        
+        # Download pickle file
+        response = minio_client.get_object(bucket_name, object_path)
+        model_bytes = BytesIO(response.read())
+        model = pickle.load(model_bytes)
+        
+        return model
+    
+    except Exception as e:
+        st.error(f"❌ Không thể load model: {e}")
+        return None
 
-    return prob, label, color, msg, icon
 
-# --- 4. GIAO DIỆN CHÍNH ---
+# Load model at startup
+MODEL = load_model_from_minio()
+
+
+# --- 4. LOGIC XỬ LÝ ---
+def analyze_news(text):
+    """Analyze news text using loaded model.
+    
+    Args:
+        text: News text to analyze.
+    
+    Returns:
+        tuple: (prob, label, color, msg, icon)
+    """
+    if MODEL is None:
+        # Fallback nếu không load được model
+        return 0.5, "LỖI: Model chưa load", "#ff0000", "Không thể phân tích.", "⚠️"
+    
+    try:
+        # Gọi hàm predict từ models.py
+        pred, prob = predict_fake_news(text, MODEL)
+        
+        # prob là array, lấy phần tử đầu tiên
+        prob_value = float(prob[0])
+        
+        # Quy tắc đánh giá dựa trên xác suất tin giả
+        if prob_value >= 0.8:
+            label = "FAKE NEWS (Tin giả)"
+            color = "#ff4b4b"  # Đỏ
+            icon = "🚨"
+            msg = "Cảnh báo: Nội dung này có dấu hiệu bịa đặt cao."
+        elif 0.6 <= prob_value < 0.8:
+            label = "KHẢ NĂNG CAO LÀ TIN GIẢ"
+            color = "#ff9800"  # Cam
+            icon = "⚠️"
+            msg = "Độ tin cậy thấp. Cần kiểm tra kỹ nguồn tin."
+        elif 0.5 <= prob_value < 0.6:
+            label = "NGHI NGỜ"
+            color = "#fbc02d"  # Vàng
+            icon = "🤔"
+            msg = "Thông tin chưa rõ ràng, cần đối chiếu thêm."
+        elif 0.4 <= prob_value < 0.5:
+            label = "TRUNG LẬP"
+            color = "#9e9e9e"  # Xám
+            icon = "⚖️"
+            msg = "Chưa đủ dữ kiện để kết luận."
+        elif 0.2 <= prob_value < 0.4:
+            label = "THIÊN VỀ TIN THẬT"
+            color = "#42a5f5"  # Xanh dương
+            icon = "✅"
+            msg = "Thông tin có cơ sở, khá đáng tin."
+        else:  # prob_value < 0.2
+            label = "REAL NEWS (Tin thật)"
+            color = "#4caf50"  # Xanh lá
+            icon = "🛡️"
+            msg = "Độ xác thực rất cao. Tin chuẩn."
+
+        return prob_value, label, color, msg, icon
+    
+    except Exception as e:
+        st.error(f"❌ Lỗi khi phân tích: {e}")
+        return 0.5, "LỖI", "#ff0000", f"Lỗi: {str(e)}", "⚠️"
+
+# --- 5. GIAO DIỆN CHÍNH ---
 
 # Tiêu đề đẹp (Logo text)
 st.markdown('<h1 class="main-title">EnsemTrust GPT</h1>', unsafe_allow_html=True)
