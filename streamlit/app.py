@@ -1,6 +1,15 @@
 import streamlit as st
 import time
-import random
+import pickle
+from io import BytesIO
+from minio import Minio
+import os
+import sys
+
+# Add pipeline path to sys.path to import from pipeline.utils
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from pipeline.utils.models import predict_fake_news
 
 # --- 1. CẤU HÌNH TRANG (QUAN TRỌNG: Dùng layout="centered" cho giống ChatGPT) ---
 st.set_page_config(

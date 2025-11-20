@@ -1,38 +1,79 @@
+"""
+Machine learning models and utilities for fake news detection.
+
+Provides factory functions for creating sklearn classifiers (SVM, LogReg, LightGBM),
+stacking ensemble builder, model evaluation, and inference pipeline.
+"""
+
+import os
+import pandas as pd
+from dotenv import load_dotenv
+
 from sklearn.metrics import classification_report, accuracy_score, roc_auc_score
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import StackingClassifier
+
+from pipeline.utils.feature_engineer import (
+    handcrafted_features,
+    create_svd_transformer,
+    create_tfidf_vectorizer,
+    combine,
+    encode_texts_st
+)
 
 try:
     from lightgbm import LGBMClassifier
 except ImportError:  # optional dependency
     LGBMClassifier = None
 
-import os
-from dotenv import load_dotenv
 
-load_dotenv ()
-
-
+load_dotenv()
 RANDOM_STATE = int(os.getenv('RANDOM_STATE', 42))
 
 
 
 def evaluate_model(model, X, y, name="Dataset"):
+    """Evaluate a binary classifier and return metrics dict.
+    
+    Args:
+        model: Trained classifier with predict/predict_proba methods.
+        X: Feature matrix (numpy array or pandas DataFrame).
+        y: True labels (numpy array or pandas Series).
+        name: Dataset name for logging.
+    
+    Returns:
+        dict: Contains accuracy, AUC, and classification report string.
+    """
     y_pred = model.predict(X)
     y_prob = model.predict_proba(X)[:, 1]
-    print(f"--- {name} ---")
-    print("Accuracy:", accuracy_score(y, y_pred))
-    print("AUC:", roc_auc_score(y, y_prob))
-    print(classification_report(y, y_pred))
+    
+    return {
+        "dataset_name": name,
+        "accuracy": float(accuracy_score(y, y_pred)),
+        "auc": float(roc_auc_score(y, y_prob)),
+        "classification_report": classification_report(y, y_pred)
+    }
 
 
 def SVM_model():
-    """Return a binary SVM classifier with probability outputs enabled."""
-    return SVC(kernel="linear", probability=True, random_state=42)
+    """Return a binary SVM classifier with probability outputs enabled.
+    
+    Returns:
+        SVC: Linear SVM classifier with probability=True.
+    """
+    return SVC(kernel="linear", probability=True, random_state=RANDOM_STATE)
 
 
 def LightGBM_model():
-    """Return a LightGBM classifier with reasonable defaults for binary classification."""
+    """Return a LightGBM classifier with reasonable defaults for binary classification.
+    
+    Returns:
+        LGBMClassifier: Configured LightGBM binary classifier.
+        
+    Raises:
+        ImportError: If lightgbm is not installed.
+    """
     if LGBMClassifier is None:
         raise ImportError("lightgbm is not installed. Please add it to your dependencies.")
 
@@ -43,13 +84,19 @@ def LightGBM_model():
         subsample=0.8,
         colsample_bytree=0.8,
         objective="binary",
-        random_state=42,
+        random_state=RANDOM_STATE,
         n_jobs=-1,
     )
 
 
 def logisticRegression_model():
-    """Return a regularized logistic regression classifier."""
+    """Return a regularized logistic regression classifier.
+    
+    Uses SAGA solver for L2 penalty with moderate regularization strength.
+    
+    Returns:
+        LogisticRegression: Configured logistic regression classifier.
+    """
     return LogisticRegression(
         max_iter=5000,
         solver="saga",
@@ -57,3 +104,88 @@ def logisticRegression_model():
         C=0.5,
         random_state=RANDOM_STATE
     )
+
+
+def meta_model():
+    """Return a logistic regression meta-learner for stacking ensemble.
+    
+    Uses LBFGS solver with increased max_iter for stability.
+    
+    Returns:
+        LogisticRegression: Meta-learner for stacking.
+    """
+    return LogisticRegression(
+        max_iter=2000,
+        solver="lbfgs",
+        random_state=RANDOM_STATE
+    )
+
+
+def stacking_ensemble_model(estimators, final_estimator=None):
+    """Build a stacking ensemble classifier.
+    
+    Args:
+        estimators: List of (name, model) tuples for base learners.
+        final_estimator: Meta-learner (defaults to meta_model() if None).
+    
+    Returns:
+        StackingClassifier: Configured stacking ensemble.
+    """
+    if final_estimator is None:
+        final_estimator = meta_model()
+    
+    return StackingClassifier(
+        estimators=estimators,
+        final_estimator=final_estimator,
+        cv=3,
+        n_jobs=-1,
+        passthrough=False
+    )
+
+
+def predict_fake_news(text_list, model):
+    """Predict fake news probability for given text(s).
+    
+    Applies full feature engineering pipeline (handcrafted + TF-IDF+SVD + embeddings)
+    and runs inference with the trained model.
+    
+    Args:
+        text_list: Single text string or list of text strings.
+        model: Trained sklearn classifier with predict_proba method.
+    
+    Returns:
+        tuple: (predictions, probabilities)
+            - predictions: Binary predictions (0=real, 1=fake) as numpy array.
+            - probabilities: Probability of fake news (class 1) as numpy array.
+    
+    Note:
+        This function creates new transformer instances (TF-IDF, SVD) each time.
+        For production, load pre-fitted transformers from MinIO instead.
+    """
+    if isinstance(text_list, str):
+        text_list = [text_list]
+
+    # Initialize transformers (should load from MinIO in production)
+    svd = create_svd_transformer()
+    tfidf = create_tfidf_vectorizer()
+
+    series = pd.Series(text_list)
+
+    # Extract handcrafted features
+    hand = handcrafted_features(series)
+
+    # Extract TF-IDF + SVD features
+    tfidf_vec = tfidf.fit_transform(series)
+    svd_vec = svd.fit_transform(tfidf_vec)
+
+    # Extract sentence embeddings
+    emb = encode_texts_st(text_list)
+
+    # Combine all features
+    X_all = combine(emb, svd_vec, hand)
+
+    # Predict
+    prob = model.predict_proba(X_all)[:, 1]
+    pred = (prob >= 0.5).astype(int)
+
+    return pred, prob
