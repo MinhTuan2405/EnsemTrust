@@ -35,7 +35,9 @@ dependencies = [
     "sentence-transformers",
     "pyspark==3.5.7",
     "lightgbm",
-    "python-dotenv"
+    "python-dotenv",
+    matplotlib = "^3.8.0",
+    seaborn = "^0.13.0"
 ]
 
 [build-system]
