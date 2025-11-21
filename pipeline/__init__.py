@@ -3,7 +3,7 @@ from dagster import Definitions, load_assets_from_modules
 from pipeline.assets.gold import gold_layer
 from pipeline.assets.bronze import bronze_layer
 from pipeline.assets.silver import get_dataset, transform
-from pipeline.assets.machine_learning import load_data, feature_engineering
+from pipeline.assets.machine_learning import load_data, feature_engineering, train_model, inference
 from pipeline.resources.minio import minio_resource
 
 from pipeline.sensors.file_sensor import (
@@ -23,7 +23,7 @@ load_dotenv ()
 bronze_assets = load_assets_from_modules([bronze_layer])
 silver_assets = load_assets_from_modules([get_dataset, transform])
 gold_assets = load_assets_from_modules([gold_layer])
-machine_learning_assets = load_assets_from_modules([load_data, feature_engineering])
+machine_learning_assets = load_assets_from_modules([load_data, feature_engineering, train_model, inference])
 
 all_assets = [*bronze_assets, *silver_assets, *gold_assets, *machine_learning_assets]
 

@@ -125,28 +125,17 @@ def train_logistic_regression(context: AssetExecutionContext, combine_features):
     
     plt.tight_layout()
     
-    # Save plot to MinIO
+    # Save plot to metadata for Dagster UI display
     plot_buffer = BytesIO()
     plt.savefig(plot_buffer, format='png', dpi=150, bbox_inches='tight')
     plot_buffer.seek(0)
-    plt.close()
-    
-    plot_path = "plots/logistic_regression_performance.png"
-    minio_client.put_object(
-        bucket_name,
-        plot_path,
-        plot_buffer,
-        length=plot_buffer.getbuffer().nbytes,
-        content_type="image/png"
-    )
-    context.log.info(f"Saved plot to s3://{bucket_name}/{plot_path}")
     
     return Output(
         value=model,
         metadata={
             "model_type": "LogisticRegression",
             "model_path": f"s3://{bucket_name}/{model_path}",
-            "plot_path": f"s3://{bucket_name}/{plot_path}",
+            "plot": {"png": plot_buffer.getvalue()},
             "train_accuracy": float(train_metrics['accuracy']),
             "train_auc": float(train_metrics['auc']),
             "val_accuracy": float(val_metrics['accuracy']),
@@ -271,28 +260,17 @@ def train_svm(context: AssetExecutionContext, combine_features):
     
     plt.tight_layout()
     
-    # Save plot to MinIO
+    # Save plot to metadata for Dagster UI display
     plot_buffer = BytesIO()
     plt.savefig(plot_buffer, format='png', dpi=150, bbox_inches='tight')
     plot_buffer.seek(0)
-    plt.close()
-    
-    plot_path = "plots/svm_performance.png"
-    minio_client.put_object(
-        bucket_name,
-        plot_path,
-        plot_buffer,
-        length=plot_buffer.getbuffer().nbytes,
-        content_type="image/png"
-    )
-    context.log.info(f"Saved plot to s3://{bucket_name}/{plot_path}")
     
     return Output(
         value=model,
         metadata={
             "model_type": "SVM",
             "model_path": f"s3://{bucket_name}/{model_path}",
-            "plot_path": f"s3://{bucket_name}/{plot_path}",
+            "plot": {"png": plot_buffer.getvalue()},
             "train_accuracy": float(train_metrics['accuracy']),
             "train_auc": float(train_metrics['auc']),
             "val_accuracy": float(val_metrics['accuracy']),
@@ -328,9 +306,13 @@ def train_lightgbm(context: AssetExecutionContext, combine_features):
     
     context.log.info('Training LightGBM model...')
     
-    # Create and train model
+    # Create and train model with validation set for early stopping
     model = LightGBM_model()
-    model.fit(X_train, y_train)
+    model.fit(
+        X_train, y_train,
+        eval_set=[(X_val, y_val)],
+        eval_metric='auc'
+    )
     
     context.log.info('Model training completed')
     
@@ -417,28 +399,17 @@ def train_lightgbm(context: AssetExecutionContext, combine_features):
     
     plt.tight_layout()
     
-    # Save plot to MinIO
+    # Save plot to metadata for Dagster UI display
     plot_buffer = BytesIO()
     plt.savefig(plot_buffer, format='png', dpi=150, bbox_inches='tight')
     plot_buffer.seek(0)
-    plt.close()
-    
-    plot_path = "plots/lightgbm_performance.png"
-    minio_client.put_object(
-        bucket_name,
-        plot_path,
-        plot_buffer,
-        length=plot_buffer.getbuffer().nbytes,
-        content_type="image/png"
-    )
-    context.log.info(f"Saved plot to s3://{bucket_name}/{plot_path}")
     
     return Output(
         value=model,
         metadata={
             "model_type": "LightGBM",
             "model_path": f"s3://{bucket_name}/{model_path}",
-            "plot_path": f"s3://{bucket_name}/{plot_path}",
+            "plot": {"png": plot_buffer.getvalue()},
             "train_accuracy": float(train_metrics['accuracy']),
             "train_auc": float(train_metrics['auc']),
             "val_accuracy": float(val_metrics['accuracy']),
@@ -524,17 +495,6 @@ def train_stacking_ensemble(context: AssetExecutionContext,
     )
     context.log.info(f"Saved model to s3://{bucket_name}/{model_path}")
     
-    # Also save as best_model.pkl for easy access
-    best_model_path = "model/best_model.pkl"
-    model_buffer.seek(0)
-    minio_client.put_object(
-        bucket_name,
-        best_model_path,
-        model_buffer,
-        length=model_buffer.getbuffer().nbytes,
-        content_type="application/octet-stream"
-    )
-    context.log.info(f"Saved as best model to s3://{bucket_name}/{best_model_path}")
     
     # Create visualization plots
     fig, axes = plt.subplots(2, 2, figsize=(15, 12))
@@ -589,21 +549,11 @@ def train_stacking_ensemble(context: AssetExecutionContext,
     
     plt.tight_layout()
     
-    # Save plot to MinIO
+    # Save plot to metadata for Dagster UI display
     plot_buffer = BytesIO()
     plt.savefig(plot_buffer, format='png', dpi=150, bbox_inches='tight')
     plot_buffer.seek(0)
-    plt.close()
     
-    plot_path = "plots/stacking_ensemble_performance.png"
-    minio_client.put_object(
-        bucket_name,
-        plot_path,
-        plot_buffer,
-        length=plot_buffer.getbuffer().nbytes,
-        content_type="image/png"
-    )
-    context.log.info(f"Saved plot to s3://{bucket_name}/{plot_path}")
     
     return Output(
         value=model,
@@ -611,8 +561,7 @@ def train_stacking_ensemble(context: AssetExecutionContext,
             "model_type": "StackingEnsemble",
             "base_models": "LogisticRegression, SVM, LightGBM",
             "model_path": f"s3://{bucket_name}/{model_path}",
-            "best_model_path": f"s3://{bucket_name}/{best_model_path}",
-            "plot_path": f"s3://{bucket_name}/{plot_path}",
+            "plot": {"png": plot_buffer.getvalue()},
             "train_accuracy": float(train_metrics['accuracy']),
             "train_auc": float(train_metrics['auc']),
             "val_accuracy": float(val_metrics['accuracy']),
