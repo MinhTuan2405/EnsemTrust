@@ -49,7 +49,7 @@ def evaluate_model(model, X, y, name="Dataset"):
     y_prob = model.predict_proba(X)[:, 1]
     
     return {
-        "dataset_name": name,
+        "model name": name,
         "accuracy": float(accuracy_score(y, y_pred)),
         "auc": float(roc_auc_score(y, y_prob)),
         "classification_report": classification_report(y, y_pred)
