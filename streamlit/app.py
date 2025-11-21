@@ -64,7 +64,7 @@ st.markdown("""
 
 # --- 3. KHỞI TẠO MINIO CLIENT VÀ LOAD MODEL ---
 @st.cache_resource
-def load_model_from_minio(model_name="best_model.pkl"):
+def load_model_from_minio(model_name="stacking_ensemble.pkl"):
     """Load trained model from MinIO bucket.
     
     Args:
