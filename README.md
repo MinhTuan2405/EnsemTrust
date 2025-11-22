@@ -60,67 +60,63 @@ Category | Stack
 ---------|------
 Orchestration | Dagster
 Storage & Lake | MinIO (object store), versioned buckets
-Metadata / Relational | Postgres
-Query Engine | Trino + Hive Metastore
+### 3.1 Overview
+![Architecture Overview](image/architecture_overview.png)
 Distributed Processing | Apache Spark (Master + Workers)
 ML / NLP | scikit-learn, LightGBM, SentenceTransformers, PyTorch
-Feature Extraction | TF-IDF, SVD, handcrafted metrics, MiniLM embeddings
-Visualization | Matplotlib, Seaborn, Streamlit UI, Metabase dashboards
+### 3.2 Data Lineage
+![Dagster Lineage Overview](image/dagster_lineage_overview.svg)
+![Bronze Layer](image/bronze_layer.svg) ![Silver Layer](image/silver_layer.svg) ![Gold Layer](image/gold_layer.svg)
 BI & Exploration | CloudBeaver (SQL GUI), Metabase (analytics)
 Infrastructure | Docker, docker-compose, optional NVIDIA GPU runtime
-
-## 5. Prerequisites
+### 3.3 Machine Learning Layer
+![Machine Learning Layer](image/machine_learning_layer.svg)
 - Docker (>= 24.x) & Docker Compose plugin.
-- For GPU support:
+7. Serving: Stacking ensemble model persisted as `stacking_ensemble.pkl` and consumed directly by the Streamlit application.
   - NVIDIA GPU with recent driver.
-  - NVIDIA Container Toolkit installed (Linux or WSL2 environment).
+5. Train ensemble: `train_stacking_ensemble` (produces `stacking_ensemble.pkl`)
 - Adequate system resources (recommend ≥16GB RAM for embedding + LightGBM training).
-- Ports availability: 3000 (Dagster), 8501 (Streamlit), 9000/9001 (MinIO), 8082 (Spark UI), 8090 (Trino), 8978 (CloudBeaver), 3007 (Metabase).
+- Loads `stacking_ensemble.pkl`.
 
-## 6. Installation Guide
+Retrain by re-materializing training assets. The ensemble asset updates `stacking_ensemble.pkl` consumed by Streamlit.
 ### 6.1 Clone Repository
-```bash
-git clone https://github.com/MinhTuan2405/EnsemTrust.git
-cd EnsemTrust
-```
+### Development Team
+- **Nguyễn Hà Minh Tuấn**
+- **Trần Phan Thanh Tùng**
+- **Trần Nguyễn Đức Trung**
 
-### 6.2 Configure Environment Variables
-Copy example file:
-```bash
-cp .example.env .env
-```
-Adjust keys: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, MINIO_ROOT_USER, MINIO_ROOT_PASSWORD, DAGSTER_HOME, RANDOM_STATE, etc.
+Affiliation: **University of Information Technology (UIT)** – **Faculty of Information Engineering & Sciences**.
 
-### 6.3 GPU Setup (Optional)
-#### Linux
+### Advisor
+- **Dr. Hà Minh Tân** (Faculty of Information Engineering and Sciences)
 ```bash
-# Install NVIDIA drivers (distribution-specific)
+<!-- Roadmap and License sections intentionally removed per project owner request -->
 # Install container toolkit
-sudo apt-get update
+### 3.1 Tổng Quan
+![Tổng quan kiến trúc](image/architecture_overview.png)
 sudo apt-get install -y nvidia-driver-535
-curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+### 3.2 Data Lineage
+![Tổng quan lineage Dagster](image/dagster_lineage_overview.svg)
+![Lớp Bronze](image/bronze_layer.svg) ![Lớp Silver](image/silver_layer.svg) ![Lớp Gold](image/gold_layer.svg)
 curl -fsSL https://nvidia.github.io/libnvidia-container/ubuntu/$(. /etc/os-release; echo $VERSION_ID)/libnvidia-container.list | \
-  sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+### 3.3 Lớp Học Máy
+![Lớp học máy](image/machine_learning_layer.svg)
   sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-sudo apt-get update
+5. Ensemble: `train_stacking_ensemble` (lưu `stacking_ensemble.pkl`).
 sudo apt-get install -y nvidia-container-toolkit
-sudo nvidia-ctk runtime configure --runtime=docker
+- Tải `stacking_ensemble.pkl`.
 sudo systemctl restart docker
-```
-Validate:
-```bash
-docker run --rm --gpus all nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04 nvidia-smi
-```
+Nhóm phát triển:
+- **Nguyễn Hà Minh Tuấn**
+- **Trần Phan Thanh Tùng**
+- **Trần Nguyễn Đức Trung**
 
-#### Windows (WSL2)
+Thuộc **Trường Đại học Công nghệ Thông tin (UIT)** – **Khoa Khoa học Kĩ thuật Thông tin**.
+
+Người hướng dẫn:
+- **Tiến sĩ Hà Minh Tân** (Giảng viên Khoa Khoa học Kĩ thuật Thông tin)
 1. Enable WSL2 and install Ubuntu distribution.
-2. Install latest NVIDIA Windows driver (provides WSL CUDA support).
-3. Inside WSL, follow Linux GPU steps above.
-4. Confirm with the same `docker run --gpus all` command.
-
-### 6.4 Build Images
-```bash
-docker compose build
+<!-- Đã loại bỏ các mục Định Hướng Tương Lai và Giấy Phép theo yêu cầu -->
 ```
 Dagster image already includes CUDA base for LightGBM / PyTorch acceleration.
 
