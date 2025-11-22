@@ -474,7 +474,7 @@ University of Information Technology (UIT)
 
 ### License
 
-This project is developed for educational purposes as part of a university capstone project.
+This project is developed for educational purposes 
 
 ---
 
@@ -956,7 +956,7 @@ Trường Đại học Công nghệ Thông tin (UIT)
 
 ### Giấy phép
 
-Dự án này được phát triển cho mục đích giáo dục như một phần của đồ án tốt nghiệp đại học.
+Dự án này được phát triển cho mục đích giáo dục 
 
 ---
 
