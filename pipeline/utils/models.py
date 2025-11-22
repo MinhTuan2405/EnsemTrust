@@ -11,7 +11,8 @@ from dotenv import load_dotenv
 import torch
 
 from sklearn.metrics import classification_report, accuracy_score, roc_auc_score
-from sklearn.svm import SVC
+from sklearn.svm import LinearSVC
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import StackingClassifier
 
@@ -62,12 +63,28 @@ def evaluate_model(model, X, y, name="Dataset"):
 
 
 def SVM_model():
-    """Return a binary SVM classifier with probability outputs enabled.
+    """Return a binary Linear SVM classifier with probability outputs.
+    
+    Uses LinearSVC (optimized for linear kernel) wrapped with CalibratedClassifierCV
+    for probability estimates. Much faster than SVC(kernel='linear').
     
     Returns:
-        SVC: Linear SVM classifier with probability=True.
+        CalibratedClassifierCV: Linear SVM with probability calibration.
     """
-    return SVC(kernel="linear", probability=True, random_state=RANDOM_STATE)
+    # Old approach (VERY SLOW - can take 3+ hours on large datasets):
+    # from sklearn.svm import SVC
+    # return SVC(kernel="linear", probability=True, random_state=RANDOM_STATE)
+    
+    # New approach: LinearSVC is much faster than SVC(kernel='linear') for large datasets
+    # LinearSVC doesn't have probability output, so we wrap it with CalibratedClassifierCV
+    base_svm = LinearSVC(
+        dual="auto",  # Auto-select solver based on n_samples vs n_features
+        max_iter=5000,
+        random_state=RANDOM_STATE,
+        class_weight='balanced'  # Handle imbalanced data
+    )
+    # Wrap with calibration to get probability estimates (uses 3-fold CV)
+    return CalibratedClassifierCV(base_svm, cv=3)
 
 
 def LightGBM_model():
