@@ -3,7 +3,7 @@
 -- ============================================================================
 -- These queries are designed to work with Trino query engine
 -- Catalog: delta (Delta Lake tables in MinIO/S3)
--- Schema: default
+-- Schema: gold
 -- Table: news_dataset
 -- ============================================================================
 
@@ -23,7 +23,7 @@ SELECT
     COUNT(DISTINCT year) as year_span,
     ROUND(AVG(text_length), 2) as avg_text_length,
     ROUND(AVG(title_length), 2) as avg_title_length
-FROM delta.default.news_dataset;
+FROM delta.gold.news_dataset;
 
 
 -- 1.2 Label Distribution (for pie charts)
@@ -36,7 +36,7 @@ SELECT
     END as news_type,
     COUNT(*) as count,
     ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) as percentage
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 GROUP BY label
 ORDER BY label;
 
@@ -50,7 +50,7 @@ SELECT
     ROUND(AVG(text_length), 0) as avg_article_length,
     MAX(text_length) as longest_article,
     MIN(text_length) as shortest_article
-FROM delta.default.news_dataset;
+FROM delta.gold.news_dataset;
 
 
 -- ============================================================================
@@ -65,7 +65,7 @@ SELECT
     ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) as percentage,
     SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) as fake_count,
     SUM(CASE WHEN label = 1 THEN 1 ELSE 0 END) as real_count
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 GROUP BY subject
 ORDER BY article_count DESC;
 
@@ -79,7 +79,7 @@ SELECT
     SUM(CASE WHEN label = 1 THEN 1 ELSE 0 END) as real_news,
     ROUND(100.0 * SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) / COUNT(*), 2) as fake_percentage,
     ROUND(100.0 * SUM(CASE WHEN label = 1 THEN 1 ELSE 0 END) / COUNT(*), 2) as real_percentage
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 GROUP BY subject
 ORDER BY total DESC;
 
@@ -91,7 +91,7 @@ SELECT
     SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) as fake_count,
     COUNT(*) as total_count,
     ROUND(100.0 * SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) / COUNT(*), 2) as fake_rate
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 GROUP BY subject
 HAVING COUNT(*) >= 10  -- Filter subjects with at least 10 articles
 ORDER BY fake_rate DESC
@@ -108,7 +108,7 @@ SELECT
     MIN(text_length) as min_text_length,
     MAX(text_length) as max_text_length,
     ROUND(STDDEV(text_length), 0) as stddev_text_length
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 GROUP BY subject
 ORDER BY total_articles DESC;
 
@@ -125,7 +125,7 @@ SELECT
     SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) as fake_news,
     SUM(CASE WHEN label = 1 THEN 1 ELSE 0 END) as real_news,
     ROUND(100.0 * SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) / COUNT(*), 2) as fake_percentage
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 WHERE year IS NOT NULL
 GROUP BY year
 ORDER BY year;
@@ -139,7 +139,7 @@ SELECT
     SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) as fake_news,
     SUM(CASE WHEN label = 1 THEN 1 ELSE 0 END) as real_news,
     ROUND(AVG(text_length), 0) as avg_text_length
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 WHERE month IS NOT NULL
 GROUP BY month
 ORDER BY 
@@ -167,7 +167,7 @@ SELECT
     SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) as fake_news,
     SUM(CASE WHEN label = 1 THEN 1 ELSE 0 END) as real_news,
     ROUND(100.0 * SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) / COUNT(*), 2) as fake_rate
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 WHERE year_month IS NOT NULL
 GROUP BY year_month
 ORDER BY year_month;
@@ -180,7 +180,7 @@ SELECT
     COUNT(*) as articles,
     SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) as fake,
     SUM(CASE WHEN label = 1 THEN 1 ELSE 0 END) as real
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 WHERE year_month IS NOT NULL
 GROUP BY year_month
 ORDER BY year_month DESC
@@ -196,7 +196,7 @@ SELECT
     COUNT(*) - LAG(COUNT(*)) OVER (ORDER BY year) as growth,
     ROUND(100.0 * (COUNT(*) - LAG(COUNT(*)) OVER (ORDER BY year)) / 
           NULLIF(LAG(COUNT(*)) OVER (ORDER BY year), 0), 2) as growth_percentage
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 WHERE year IS NOT NULL
 GROUP BY year
 ORDER BY year;
@@ -220,7 +220,7 @@ SELECT
     MAX(text_length) as max_length,
     ROUND(STDDEV(text_length), 0) as stddev_length,
     PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY text_length) as median_length
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 GROUP BY label
 ORDER BY label;
 
@@ -239,7 +239,7 @@ SELECT
     COUNT(*) as count,
     SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) as fake_count,
     SUM(CASE WHEN label = 1 THEN 1 ELSE 0 END) as real_count
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 GROUP BY 
     CASE 
         WHEN text_length < 500 THEN '0-500'
@@ -274,7 +274,7 @@ SELECT
     COUNT(CASE WHEN title_length < 50 THEN 1 END) as short_titles,
     COUNT(CASE WHEN title_length BETWEEN 50 AND 100 THEN 1 END) as medium_titles,
     COUNT(CASE WHEN title_length > 100 THEN 1 END) as long_titles
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 GROUP BY label
 ORDER BY label;
 
@@ -287,8 +287,8 @@ SELECT
     title,
     text_length,
     year_month
-FROM delta.default.news_dataset
-WHERE text_length > (SELECT PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY text_length) FROM delta.default.news_dataset)
+FROM delta.gold.news_dataset
+WHERE text_length > (SELECT PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY text_length) FROM delta.gold.news_dataset)
 ORDER BY text_length DESC
 LIMIT 50;
 
@@ -301,8 +301,8 @@ SELECT
     title,
     text_length,
     year_month
-FROM delta.default.news_dataset
-WHERE text_length < (SELECT PERCENTILE_CONT(0.05) WITHIN GROUP (ORDER BY text_length) FROM delta.default.news_dataset)
+FROM delta.gold.news_dataset
+WHERE text_length < (SELECT PERCENTILE_CONT(0.05) WITHIN GROUP (ORDER BY text_length) FROM delta.gold.news_dataset)
     AND text_length > 0
 ORDER BY text_length ASC
 LIMIT 50;
@@ -320,7 +320,7 @@ SELECT
     COUNT(*) as article_count,
     SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) as fake_count,
     SUM(CASE WHEN label = 1 THEN 1 ELSE 0 END) as real_count
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 WHERE year IS NOT NULL
 GROUP BY subject, year
 ORDER BY subject, year;
@@ -338,7 +338,7 @@ SELECT
         WHEN ROUND(100.0 * SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) / COUNT(*), 2) > 40 THEN 'Medium Risk'
         ELSE 'Low Risk'
     END as risk_level
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 WHERE year_month IS NOT NULL
 GROUP BY year_month
 HAVING COUNT(*) >= 10
@@ -352,7 +352,7 @@ SELECT
     COUNT(DISTINCT subject) as unique_subjects,
     COUNT(*) as total_articles,
     ROUND(1.0 * COUNT(*) / COUNT(DISTINCT subject), 2) as articles_per_subject
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 GROUP BY label;
 
 
@@ -368,7 +368,7 @@ SELECT
     SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) as fake,
     SUM(CASE WHEN label = 1 THEN 1 ELSE 0 END) as real,
     ROUND(100.0 * SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) / COUNT(*), 2) as fake_percentage
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 GROUP BY 
     CASE 
         WHEN text_length < 1000 THEN 'Short'
@@ -388,7 +388,7 @@ WITH ranked_articles AS (
         text_length,
         year,
         ROW_NUMBER() OVER (PARTITION BY label ORDER BY text_length DESC) as rank
-    FROM delta.default.news_dataset
+    FROM delta.gold.news_dataset
 )
 SELECT 
     type,
@@ -419,7 +419,7 @@ SELECT
     ROUND(100.0 * SUM(CASE WHEN title IS NOT NULL AND title != '' 
                           AND text IS NOT NULL AND text != ''
                           AND subject IS NOT NULL AND subject != '' THEN 1 ELSE 0 END) / COUNT(*), 2) as data_completeness_pct
-FROM delta.default.news_dataset;
+FROM delta.gold.news_dataset;
 
 
 -- 6.2 Record Count by Date Range
@@ -430,7 +430,7 @@ SELECT
     MIN(text_length) as min_length,
     MAX(text_length) as max_length,
     ROUND(AVG(text_length), 0) as avg_length
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 WHERE year IS NOT NULL
 GROUP BY year
 ORDER BY year DESC;
@@ -447,7 +447,7 @@ SELECT
         WHEN ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) > 60 THEN 'Over-represented'
         ELSE 'Under-represented'
     END as status
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 GROUP BY label
 ORDER BY label;
 
@@ -460,7 +460,7 @@ SELECT
     COUNT(DISTINCT label) as different_labels,
     STRING_AGG(DISTINCT CAST(label AS VARCHAR), ', ') as labels,
     STRING_AGG(DISTINCT subject, ', ') as subjects
-FROM delta.default.news_dataset
+FROM delta.gold.news_dataset
 GROUP BY title
 HAVING COUNT(*) > 1
 ORDER BY occurrence DESC
@@ -479,14 +479,14 @@ SELECT
         CAST(ROUND(100.0 * SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) / COUNT(*), 1) AS VARCHAR) || '%)' as metric2,
     CAST(COUNT(DISTINCT subject) AS VARCHAR) || ' Subjects' as metric3,
     CAST(COUNT(DISTINCT year) AS VARCHAR) || ' Years' as metric4
-FROM delta.default.news_dataset;
+FROM delta.gold.news_dataset;
 
 
 -- 7.2 Gauge Chart - Fake News Rate
 -- Purpose: Single value for gauge visualization
 SELECT 
     ROUND(100.0 * SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) / COUNT(*), 1) as fake_news_percentage
-FROM delta.default.news_dataset;
+FROM delta.gold.news_dataset;
 
 
 -- 7.3 Trending Subjects (Last Year)
@@ -495,8 +495,8 @@ SELECT
     subject,
     COUNT(*) as article_count,
     SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) as fake_count
-FROM delta.default.news_dataset
-WHERE year = (SELECT MAX(year) FROM delta.default.news_dataset WHERE year IS NOT NULL)
+FROM delta.gold.news_dataset
+WHERE year = (SELECT MAX(year) FROM delta.gold.news_dataset WHERE year IS NOT NULL)
 GROUP BY subject
 ORDER BY article_count DESC
 LIMIT 10;
@@ -511,7 +511,7 @@ SELECT
     COUNT(DISTINCT subject) as subjects_covered,
     ROUND(AVG(text_length), 0) as avg_article_length,
     COUNT(DISTINCT year_month) as active_periods
-FROM delta.default.news_dataset;
+FROM delta.gold.news_dataset;
 
 
 -- ============================================================================
@@ -519,19 +519,19 @@ FROM delta.default.news_dataset;
 -- ============================================================================
 
 -- 8.1 Filter by Subject (Use {{subject}} variable in Metabase)
--- SELECT * FROM delta.default.news_dataset WHERE subject = {{subject}};
+-- SELECT * FROM delta.gold.news_dataset WHERE subject = {{subject}};
 
 
 -- 8.2 Filter by Year (Use {{year}} variable)
--- SELECT * FROM delta.default.news_dataset WHERE year = {{year}};
+-- SELECT * FROM delta.gold.news_dataset WHERE year = {{year}};
 
 
 -- 8.3 Filter by Label (Use {{label}} variable: 0 for Fake, 1 for Real)
--- SELECT * FROM delta.default.news_dataset WHERE label = {{label}};
+-- SELECT * FROM delta.gold.news_dataset WHERE label = {{label}};
 
 
 -- 8.4 Date Range Filter (Use {{start_year}} and {{end_year}})
--- SELECT * FROM delta.default.news_dataset 
+-- SELECT * FROM delta.gold.news_dataset 
 -- WHERE year BETWEEN {{start_year}} AND {{end_year}};
 
 
@@ -542,7 +542,7 @@ FROM delta.default.news_dataset;
 --     COUNT(*) as count,
 --     SUM(CASE WHEN label = 0 THEN 1 ELSE 0 END) as fake,
 --     SUM(CASE WHEN label = 1 THEN 1 ELSE 0 END) as real
--- FROM delta.default.news_dataset
+-- FROM delta.gold.news_dataset
 -- WHERE 1=1
 --     [[AND subject = {{subject}}]]
 --     [[AND year = {{year}}]]
@@ -557,7 +557,7 @@ FROM delta.default.news_dataset;
 -- 1. Connection: Use Trino connector in Metabase
 -- 2. Host: trino (or localhost:8090 if external)
 -- 3. Catalog: delta
--- 4. Schema: default
+-- 4. Schema: gold
 -- 5. Table: news_dataset
 --
 -- VISUALIZATION RECOMMENDATIONS:
