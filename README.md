@@ -1,232 +1,349 @@
-# End-to-End Fake News Detection Platform
+# EnsemTrust
 
-This project is a comprehensive, end-to-end platform for detecting fake news. It implements a modern data stack (Lakehouse architecture) and an MLOps pipeline to ingest, process, analyze, and serve predictions on news data.
+## 1. Introduction
+EnsemTrust is an end-to-end fake news detection platform combining modern data engineering, lakehouse querying, scalable feature engineering, and ensemble machine learning. The system ingests raw textual news data, processes and enriches it into structured multi-layer datasets (bronze → silver → gold), and trains several base classifiers plus a stacking ensemble. A Streamlit application exposes real-time inference with calibrated confidence scoring. The architecture emphasizes reproducible lineage, modular assets, GPU-accelerated training (LightGBM, embeddings), and transparent model evaluation.
 
-## Problem Statement
+## 2. Key Features
+- Multi-layer data lake design (landing, bronze, silver, gold) on MinIO object storage.
+- Orchestrated pipelines using Dagster assets with clear lineage and metadata.
+- Spark-based scalable preprocessing and feature splitting.
+- Rich feature engineering: handcrafted linguistic metrics, TF-IDF + SVD dimensionality reduction, SentenceTransformer embeddings (all-MiniLM-L6-v2).
+- Multiple ML models: Logistic Regression, Linear SVM (Calibrated), LightGBM (GPU optional), Stacking Ensemble meta-classifier.
+- GPU-aware training with graceful CPU fallback for LightGBM.
+- Centralized artifact management (models, transformers, plots) stored in MinIO bucket `models`.
+- Automated evaluation (Accuracy, ROC AUC, classification report) across train/validation/test splits.
+- Visualization assets: confusion matrices, ROC curves, comparative accuracy/AUC panels, inference distributions.
+- Real-time inference UI built with Streamlit (probability of class 1 = Real News confidence).
+- Query and exploration stack (Trino + Hive Metastore + CloudBeaver + Metabase) for analytical/BI workflows.
+- Modular, reproducible, containerized deployment (Docker + docker-compose) with optional NVIDIA GPU acceleration.
 
-The rapid spread of misinformation poses a significant challenge. This project aims to build a scalable and reliable system that can ingest news articles from various sources, process them in near real-time, and accurately classify them as 'real' or 'fake' using advanced ensemble learning models.
+## 3. Architecture
+### 3.1 Overview
+(See `image/architecture_overview.png`)
 
-## Architecture
+Components:
+- Dagster: Orchestrates asset-based pipelines (data preparation, feature engineering, model training, inference validation).
+- MinIO: Acts as object storage & layered data lake (landing, bronze, silver, gold) and model artifact repository.
+- Postgres: Metadata store for Dagster, application metastore (Hive/Metabase), and structured persistence.
+- Hive Metastore + Trino: SQL query layer over lakehouse data.
+- Spark Cluster: Distributed processing for heavy transformations and initial dataset splits.
+- ML Layer: Feature engineering + model training + evaluation (Python / scikit-learn / LightGBM / PyTorch embeddings).
+- Streamlit App: Serves interactive classification endpoint with calibrated confidence outputs.
+- Metabase / CloudBeaver: BI and data exploration interfaces.
 
-The system is designed as a modular, containerized application orchestrated by Docker Compose. It follows a Data Lakehouse (Medallion) architecture for data processing and an end-to-end MLOps pipeline for machine learning.
+### 3.2 Data Lineage
+(See `image/dagster_lineage_overview.svg` and layer visuals `image/bronze_layer.svg`, `image/silver_layer.svg`, `image/gold_layer.svg`)
 
-![Project Architecture Diagram](./image/architecture.png)
+Flow Description:
+1. Landing → Bronze: Raw ingested news articles (title, text, subject, label) stored unmodified. Versioning enabled.
+2. Bronze → Silver: Cleaning, deduplication, consolidation of content fields; creation of unified `content` textual feature.
+3. Silver → Feature Layer: Splitting into train/validation/test (60/20/20 stratified), plus multi-modal feature extraction:
+   - Handcrafted linguistic features (length stats, lexical richness, readability metrics, etc.).
+   - TF-IDF (vocabulary size configurable) followed by SVD (latent semantic compression, 300 components).
+   - Sentence embeddings (all-MiniLM-L6-v2) with optional GPU acceleration.
+4. Feature Combination: Concatenation of embeddings + reduced TF-IDF matrix + handcrafted features.
+5. Model Training: Three base learners (Logistic Regression, Linear SVM with probability calibration, LightGBM) produce metrics and plots. A stacking ensemble uses these base models as estimators with a Logistic Regression meta-learner.
+6. Inference Assets: Sample test cases exercise each trained model; comparative analysis and probability distributions saved as plots.
+7. Serving: Best ensemble model persisted as `best_model.pkl` for the Streamlit application.
 
+### 3.3 Machine Learning Layer
+(See `image/machine_learning_layer.svg`)
+- Calibration: LinearSVC wrapped with `CalibratedClassifierCV` for probabilistic output, improving threshold interpretability.
+- Early Stopping / Validation: LightGBM integrates validation set metrics (`eval_set`) to prevent overfitting and adapt to GPU/CPU automatically.
+- Artifact Paths:
+  - Models: `models/model/*.pkl`
+  - Transformers: `models/transformers/{tfidf_vectorizer.pkl, svd_transformer.pkl}`
+  - Plots: `models/plots/*performance.png`, `models/plots/inference_*.png`
 
-## Key Features
+## 4. Core Technologies
+Category | Stack
+---------|------
+Orchestration | Dagster
+Storage & Lake | MinIO (object store), versioned buckets
+Metadata / Relational | Postgres
+Query Engine | Trino + Hive Metastore
+Distributed Processing | Apache Spark (Master + Workers)
+ML / NLP | scikit-learn, LightGBM, SentenceTransformers, PyTorch
+Feature Extraction | TF-IDF, SVD, handcrafted metrics, MiniLM embeddings
+Visualization | Matplotlib, Seaborn, Streamlit UI, Metabase dashboards
+BI & Exploration | CloudBeaver (SQL GUI), Metabase (analytics)
+Infrastructure | Docker, docker-compose, optional NVIDIA GPU runtime
 
-* **Real-time Data Ingestion:** Uses **Kafka** to handle streaming data from various sources (CSVs, Kaggle datasets).
-* **Data Lakehouse:** Implements a Medallion Architecture (**Raw**, **Silver**, **Gold** layers) on **MinIO** for scalable object storage.
-* **Large-Scale Processing:** Leverages **Apache Spark** for transforming data between lake layers.
-* **Centralized Metadata:** Uses **Hive Metastore** to manage schemas for the data lake.
-* **High-Performance Querying:** Employs **Trino** as the query engine to analyze data directly from MinIO.
-* **Metric Transformation:** Uses **dbt** for robust, SQL-based metric and business logic transformations on the Gold layer.
-* **Advanced AI/ML:**
-    * Features an **Ensemble Learning** pipeline using a Voting classifier.
-    * Combines three powerful transformer models: `phobert-base`, `velectra-base-discriminator-cased`, and `distilbert-base-multilingual-cased`.
-    * Includes a **Model Registry** for versioning and managing ML models.
-* **Orchestration:** All data and AI pipelines are orchestrated and monitored by **Dagster**.
-* **Visualization & UI:**
-    * **Metabase** provides BI dashboards and visualizations by querying Trino.
-    * **Streamlit** serves as the front-end application for user interaction.
-* **Containerization:** The entire stack is containerized with **Docker** and managed via **Docker Compose** for easy setup and portability.
+## 5. Prerequisites
+- Docker (>= 24.x) & Docker Compose plugin.
+- For GPU support:
+  - NVIDIA GPU with recent driver.
+  - NVIDIA Container Toolkit installed (Linux or WSL2 environment).
+- Adequate system resources (recommend ≥16GB RAM for embedding + LightGBM training).
+- Ports availability: 3000 (Dagster), 8501 (Streamlit), 9000/9001 (MinIO), 8082 (Spark UI), 8090 (Trino), 8978 (CloudBeaver), 3007 (Metabase).
 
-## Technology Stack
-
-| Category | Technology |
-| :--- | :--- |
-| **Orchestration** | Dagster |
-| **Data Ingestion** | Kafka |
-| **Data Lake Storage** | MinIO |
-| **Data Processing** | Apache Spark |
-| **Query Engine** | Trino (formerly PrestoSQL) |
-| **Metadata Store** | Hive Metastore |
-| **Transformation** | dbt (Data Build Tool) |
-| **ML Pipeline** | Hugging Face Transformers, scikit-learn |
-| **Visualization** | Metabase |
-| **Front-end App** | Streamlit |
-| **Database Admin** | CloudBeaver |
-| **Containerization** | Docker, Docker Compose |
-
-## How It Works: Pipeline Overview
-
-The system is divided into two main pipelines, both orchestrated by Dagster:
-
-### 1. Data Warehouse Pipeline (ELT)
-
-1.  **Ingest:** Data sources (CSVs, etc.) are streamed into **Kafka** topics.
-2.  **Land (Raw):** A Spark job consumes from Kafka and lands the raw, unchanged data into the **Raw Layer** in MinIO.
-3.  **Process (Silver):** Another Spark job reads from the Raw Layer, applies cleaning, deduplication, and standardization, and saves the result to the **Silver Layer**.
-4.  **Enrich (Gold):** A final Spark job (or dbt model) aggregates data, joins it with other sources, and creates the analysis-ready **Gold Layer**.
-5.  **Query:** **Trino** uses the **Hive Metastore** to query this data across all layers. **dbt** builds final metric tables on the Gold layer.
-
-### 2. AI Pipeline (MLOps)
-
-1.  **Trigger:** A Kafka topic (or a Dagster schedule) triggers the AI pipeline.
-2.  **Tokenize:** Input text data is passed through a **Tokenizer**.
-3.  **Ensemble Predict:** The tokens are fed into the three parallel transformer models (PhoBERT, Electra, DistilBERT).
-4.  **Vote:** A **Voting** mechanism combines the three predictions to produce a final, more robust classification (real/fake).
-5.  **Store Result:** The final prediction (**"store voting result"**) is written back into the **Gold Layer** of the Data Warehouse.
-6.  **Analyze:** With the predictions now in the Gold Layer, **Metabase** and **Streamlit** can query them via Trino to display results and insights.
-
-## Getting Started
-
-### Prerequisites
-
-Before you begin, ensure you have the following installed on your system:
-
-* **Docker** (version 20.10 or higher): [Download Docker](https://www.docker.com/get-started)
-* **Docker Compose** (version 2.0 or higher): [Install Docker Compose](https://docs.docker.com/compose/install/)
-* **Git**: For cloning the repository
-* **Minimum System Requirements:**
-  * RAM: 8GB (16GB recommended)
-  * Disk Space: 20GB free space
-  * CPU: 4 cores (8 cores recommended)
-
-### Installation & Setup
-
-Follow these steps to set up and run the project:
-
-#### 1. Clone the Repository
-
+## 6. Installation Guide
+### 6.1 Clone Repository
 ```bash
 git clone https://github.com/MinhTuan2405/EnsemTrust.git
 cd EnsemTrust
 ```
 
-#### 2. Configure Environment Variables
-
-Create a `.env` file from the example template:
-
-**On Windows (PowerShell):**
-```powershell
-Copy-Item .example.env .env
-```
-
-**On Linux/macOS:**
+### 6.2 Configure Environment Variables
+Copy example file:
 ```bash
 cp .example.env .env
 ```
+Adjust keys: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, MINIO_ROOT_USER, MINIO_ROOT_PASSWORD, DAGSTER_HOME, RANDOM_STATE, etc.
 
-**Optional:** Edit the `.env` file to customize the configuration (ports, credentials, etc.). The default values are:
-- **PostgreSQL:** Port `5433`, User `admin`, Password `admin123`
-- **MinIO:** Port `9000` (API) and `9001` (Console), Credentials `admin/admin123`
-- **Dagster:** Port `3001`
-- **Trino:** Port `8090`
-- **Metabase:** Port `3007`
-- **Streamlit:** Port `8501`
-- **Kafka UI:** Port `8088`
-- **CloudBeaver:** Port `8978`
-
-#### 3. Download Required JAR Files
-
-The project requires specific JAR files for Hadoop, PostgreSQL, and AWS SDK integration. Run the appropriate script for your OS:
-
-**On Windows (PowerShell):**
-```powershell
-.\jardownloader.ps1
-```
-
-**On Linux/macOS:**
+### 6.3 GPU Setup (Optional)
+#### Linux
 ```bash
-chmod +x jardownloader.sh
-./jardownloader.sh
+# Install NVIDIA drivers (distribution-specific)
+# Install container toolkit
+sudo apt-get update
+sudo apt-get install -y nvidia-driver-535
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -fsSL https://nvidia.github.io/libnvidia-container/ubuntu/$(. /etc/os-release; echo $VERSION_ID)/libnvidia-container.list | \
+  sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+  sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+sudo apt-get update
+sudo apt-get install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
 ```
-
-This will download the following JARs to the `./jars` directory:
-- `hadoop-aws-3.3.6.jar`
-- `postgresql-42.7.8.jar`
-- `aws-java-sdk-bundle-1.12.262.jar`
-
-#### 4. Build and Start All Services
-
-Use Docker Compose to build and start all containers:
-
-**Option A: Using Make (if available):**
+Validate:
 ```bash
-make build_run_all
+docker run --rm --gpus all nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04 nvidia-smi
 ```
 
-**Option B: Using Docker Compose directly:**
+#### Windows (WSL2)
+1. Enable WSL2 and install Ubuntu distribution.
+2. Install latest NVIDIA Windows driver (provides WSL CUDA support).
+3. Inside WSL, follow Linux GPU steps above.
+4. Confirm with the same `docker run --gpus all` command.
+
+### 6.4 Build Images
 ```bash
-docker compose up -d --build
+docker compose build
 ```
+Dagster image already includes CUDA base for LightGBM / PyTorch acceleration.
 
-This command will:
-- Build custom Docker images (Dagster, Streamlit)
-- Pull required images from Docker Hub
-- Create and start all containers in detached mode
-- Set up networks and volumes
-- Initialize databases and create MinIO buckets (bronze, silver, gold)
-
-#### 5. Verify Services are Running
-
-Check that all containers are running properly:
-
+### 6.5 Start Services
 ```bash
-docker compose ps
+docker compose up -d
 ```
 
-You should see all services in the "Up" or "running" state. You can also check the logs:
+### 6.6 Verify Health
+- Dagster UI: http://localhost:3000
+- MinIO Console: http://localhost:9001 (login with root credentials)
+- Trino UI: http://localhost:8090
+- Spark Master UI: http://localhost:8082
+- Streamlit App: http://localhost:8501
+- Metabase: http://localhost:3007
+- CloudBeaver: http://localhost:8978
 
+## 7. Running the Project
+### 7.1 Materialize Pipelines
+Open Dagster UI → select ML asset group (`ML_pipeline`) → materialize assets sequentially:
+1. Data loading & splitting (Spark) → `split_data`
+2. Feature engineering assets: `handcrafted_feature_engineering`, `tfidf_svd_feature_engineering`, `sentence_transformer_feature_engineering`
+3. Combine features → `combine_features`
+4. Train models: `train_logistic_regression`, `train_svm`, `train_lightgbm`
+5. Train ensemble: `train_stacking_ensemble` (produces `best_model.pkl`)
+6. Inference assets: `inference_logistic_regression`, `inference_svm`, `inference_lightgbm`, `inference_stacking_ensemble`, `compare_model_inference`
+
+### 7.2 Inspect Artifacts
+In MinIO bucket `models`:
+- `model/` (individual and ensemble models)
+- `transformers/` (TF-IDF + SVD fitted objects)
+- `plots/` (performance and inference visualizations)
+
+### 7.3 Use Streamlit Application
+Navigate to http://localhost:8501 and input any news text. The app:
+- Loads `best_model.pkl`.
+- Computes features using saved transformers.
+- Returns prediction: class 1 = Real, class 0 = Fake.
+- Displays calibrated confidence (probability of Real News).
+
+### 7.4 GPU Behavior
+- LightGBM attempts GPU when `torch.cuda.is_available()`.
+- On failure (e.g., OpenCL errors), it transparently falls back to CPU.
+- SentenceTransformer embeddings utilize CUDA if available.
+
+### 7.5 Updating Models
+Retrain by re-materializing training assets. The ensemble asset updates `best_model.pkl` consumed by Streamlit.
+
+## 8. Authors & Acknowledgements
+### Development Team
+- Nguyễn Hà Minh Tuấn
+- Trần Phan Thanh Tùng
+- Trần Nguyễn Đức Trung
+
+Affiliation: University of Information Technology (UIT) – Faculty of Information Engineering & Sciences.
+
+### Advisor
+- Dr. Hà Minh Tân (Faculty of Information Engineering and Sciences)
+
+## 9. Roadmap (Potential Enhancements)
+- Add Kafka ingestion back (currently commented) for streaming pipelines.
+- Implement model drift monitoring and scheduled retraining.
+- Extend feature store abstraction and add real-time API gateway.
+- Integrate model explainability (SHAP) and bias analysis.
+- Add automated benchmarking across models with historical tracking.
+
+## 10. License
+(Define license terms here if applicable.)
+
+---
+
+# EnsemTrust (Phiên bản Tiếng Việt)
+
+## 1. Giới Thiệu
+EnsemTrust là nền tảng phát hiện tin giả toàn diện, kết hợp kỹ thuật dữ liệu hiện đại, truy vấn lakehouse, trích xuất đặc trưng đa tầng và mô hình học máy dạng ensemble. Hệ thống tiếp nhận dữ liệu văn bản thô, xử lý và làm giàu thành tập dữ liệu nhiều lớp (bronze → silver → gold), sau đó huấn luyện các mô hình cơ sở và một mô hình stacking ensemble. Ứng dụng Streamlit cung cấp suy luận thời gian thực với điểm tin cậy đã được hiệu chỉnh. Kiến trúc nhấn mạnh khả năng truy vết lineage, tính mô-đun, huấn luyện tăng tốc GPU (LightGBM, embeddings) và minh bạch đánh giá mô hình.
+
+## 2. Các Tính Năng Chính
+- Thiết kế data lake nhiều lớp (landing, bronze, silver, gold) trên MinIO.
+- Pipeline tài sản Dagster có lineage rõ ràng và metadata chi tiết.
+- Xử lý mở rộng bằng Spark cho tiền xử lý và tách tập.
+- Trích xuất đặc trưng phong phú: đặc trưng ngôn ngữ thủ công, TF-IDF + SVD, embeddings SentenceTransformer.
+- Nhiều mô hình ML: Logistic Regression, Linear SVM (Calibrated), LightGBM (hỗ trợ GPU), Stacking Ensemble.
+- Huấn luyện nhận biết GPU với cơ chế fallback an toàn sang CPU.
+- Quản lý tập trung artifacts (model, transformer, biểu đồ) trong bucket MinIO `models`.
+- Tự động đánh giá: Accuracy, ROC AUC, classification report trên train/validation/test.
+- Biểu đồ trực quan: confusion matrix, ROC curve, so sánh Accuracy/AUC, phân bố suy luận.
+- Ứng dụng Streamlit suy luận thời gian thực (xác suất lớp 1 = độ tin cậy Tin Thật).
+- Hệ thống truy vấn và khảo sát (Trino + Hive Metastore + CloudBeaver + Metabase).
+- Triển khai mô-đun bằng Docker + docker-compose, hỗ trợ GPU NVIDIA tùy chọn.
+
+## 3. Kiến Trúc
+### 3.1 Tổng Quan
+Xem `image/architecture_overview.png`.
+
+Thành phần:
+- Dagster: điều phối pipeline dạng asset.
+- MinIO: lưu trữ đối tượng và data lake phân lớp.
+- Postgres: metadata Dagster, metastore Hive/Metabase.
+- Hive Metastore + Trino: lớp truy vấn SQL.
+- Spark: xử lý phân tán và tách dữ liệu.
+- Lớp ML: trích xuất đặc trưng, huấn luyện, đánh giá.
+- Streamlit: giao diện suy luận tương tác.
+- Metabase / CloudBeaver: phân tích và khám phá dữ liệu.
+
+### 3.2 Data Lineage
+Xem `image/dagster_lineage_overview.svg`, `image/bronze_layer.svg`, `image/silver_layer.svg`, `image/gold_layer.svg`.
+
+Luồng:
+1. Landing → Bronze: dữ liệu thô (title, text, subject, label) được version hóa.
+2. Bronze → Silver: làm sạch, loại trùng, hợp nhất trường `content`.
+3. Silver → Feature: chia train/validation/test (60/20/20) + trích xuất đặc trưng (handcrafted, TF-IDF+SVD, embeddings).
+4. Kết Hợp Đặc Trưng: ghép embeddings + TF-IDF giảm chiều + handcrafted.
+5. Huấn Luyện: Logistic Regression, Linear SVM (calibrated), LightGBM, sau đó Stacking Ensemble.
+6. Suy Luận: các asset inference kiểm thử kịch bản mẫu và tạo biểu đồ.
+7. Phục Vụ: `best_model.pkl` cho ứng dụng Streamlit.
+
+### 3.3 Lớp Học Máy
+Xem `image/machine_learning_layer.svg`.
+- Calibration: LinearSVC bọc bởi `CalibratedClassifierCV` trả xác suất tin cậy.
+- LightGBM: dùng tập validation (`eval_set`) chống overfitting, tự nhận GPU.
+- Artifact:
+  - Model: `models/model/*.pkl`
+  - Transformer: `models/transformers/tfidf_vectorizer.pkl`, `svd_transformer.pkl`
+  - Biểu đồ: `models/plots/*performance.png`, `inference_*.png`
+
+## 4. Công Nghệ Sử Dụng
+Danh mục | Công nghệ
+---------|-----------
+Điều phối | Dagster
+Lưu trữ | MinIO
+Cơ sở dữ liệu | Postgres
+Truy vấn | Trino + Hive Metastore
+Xử lý phân tán | Spark
+ML/NLP | scikit-learn, LightGBM, SentenceTransformers, PyTorch
+Đặc trưng | TF-IDF, SVD, handcrafted, embeddings MiniLM
+Trực quan | Matplotlib, Seaborn, Streamlit, Metabase
+Khám phá | CloudBeaver
+Hạ tầng | Docker, docker-compose, GPU NVIDIA tùy chọn
+
+## 5. Yêu Cầu Trước Khi Cài Đặt
+- Docker và Docker Compose.
+- Driver NVIDIA + NVIDIA Container Toolkit (nếu dùng GPU).
+- Tài nguyên: khuyến nghị ≥16GB RAM.
+- Mở các port dịch vụ (3000, 8501, 9000/9001, 8082, 8090, 8978, 3007).
+
+## 6. Hướng Dẫn Cài Đặt
+### 6.1 Clone Dự Án
 ```bash
-# View logs for all services
-docker compose logs
-
-# View logs for a specific service
-docker compose logs dagster
-docker compose logs trino
+git clone https://github.com/MinhTuan2405/EnsemTrust.git
+cd EnsemTrust
 ```
 
-#### 6. Wait for Services to Initialize
-
-Some services may take a few minutes to fully initialize:
-- **Trino**: Wait for the healthcheck to pass (~1-2 minutes)
-- **Metabase**: First startup may take 2-3 minutes to initialize the database
-- **Hive Metastore**: Should connect to PostgreSQL and initialize schemas
-
-You can monitor the initialization progress:
-
+### 6.2 Thiết Lập Biến Môi Trường
 ```bash
-docker compose logs -f hive-metastore
-docker compose logs -f trino
-docker compose logs -f metabase
+cp .example.env .env
 ```
+Chỉnh sửa: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, MINIO_ROOT_USER, MINIO_ROOT_PASSWORD, RANDOM_STATE.
 
-### Common Setup Commands
+### 6.3 Thiết Lập GPU (Tuỳ Chọn)
+#### Linux
+Thực hiện các lệnh cài driver và toolkit giống phần tiếng Anh.
 
-The project includes a `Makefile` with convenient commands:
+#### Windows (WSL2)
+Cài driver NVIDIA Windows, cập nhật WSL2, thực hiện lệnh Linux bên trong WSL.
 
+### 6.4 Build Image
 ```bash
-# Start all services
-make up
-
-# Stop all services
-make down
-
-# Restart all services
-make restart
-
-# Rebuild images
-make build
-
-# Build and run all services
-make build_run_all
+docker compose build
 ```
 
-## Usage
+### 6.5 Khởi Chạy Dịch Vụ
+```bash
+docker compose up -d
+```
 
-Once all containers are running, you can access the different services:
+### 6.6 Kiểm Tra
+- Dagster: http://localhost:3000
+- MinIO: http://localhost:9001
+- Trino: http://localhost:8090
+- Spark: http://localhost:8082
+- Streamlit: http://localhost:8501
+- Metabase: http://localhost:3007
+- CloudBeaver: http://localhost:8978
 
-* **Dagster UI (Orchestration):** `http://localhost:3001`
-* **Streamlit App (Front-end):** `http://localhost:8501`
-* **Metabase (BI Dashboard):** `http://localhost:3030`
-* **MinIO Console (Data Lake):** `http://localhost:9001`
-* **CloudBeaver (DB Admin):** `http://localhost:8978`
-* *(Note: Ports may vary based on your `docker-compose.yml` configuration.)*
+## 7. Cách Chạy Pipeline
+1. Materialize `split_data`.
+2. Chạy các asset đặc trưng: `handcrafted_feature_engineering`, `tfidf_svd_feature_engineering`, `sentence_transformer_feature_engineering`.
+3. Kết hợp: `combine_features`.
+4. Huấn luyện: `train_logistic_regression`, `train_svm`, `train_lightgbm`.
+5. Ensemble: `train_stacking_ensemble` (tạo `best_model.pkl`).
+6. Suy luận: `inference_*` và `compare_model_inference`.
 
-## Future Work
+## 8. Ứng Dụng Streamlit
+Truy cập http://localhost:8501, nhập văn bản. Hệ thống:
+- Tải `best_model.pkl`.
+- Dùng transformer đã lưu để trích xuất đặc trưng.
+- Trả kết quả: lớp 1 = Tin Thật, lớp 0 = Tin Giả.
+- Hiển thị độ tin cậy (xác suất tin thật).
 
-* **Model Serving API:** Implement a dedicated API (e.g., using FastAPI) to serve the model from the Model Registry for real-time, on-demand predictions in Streamlit.
-* **Automated Retraining:** Build a Dagster pipeline that periodically retrains the ensemble model on new data from the Gold Layer.
-* **Web Scraper:** Integrate a web scraping component (e.g., Scrapy) to continuously feed new articles into the Kafka pipeline.
+## 9. GPU Hoạt Động
+- LightGBM thử GPU; nếu lỗi sẽ fallback CPU.
+- Embeddings dùng CUDA nếu có.
+
+## 10. Tác Giả & Cố Vấn
+Nhóm phát triển:
+- Nguyễn Hà Minh Tuấn
+- Trần Phan Thanh Tùng
+- Trần Nguyễn Đức Trung
+
+Thuộc Trường Đại học Công nghệ Thông tin (UIT) – Khoa Khoa học Kĩ thuật Thông tin.
+
+Người hướng dẫn:
+- Tiến sĩ Hà Minh Tân (Giảng viên Khoa Khoa học Kĩ thuật Thông tin)
+
+## 11. Định Hướng Tương Lai
+- Khôi phục pipeline streaming Kafka.
+- Giám sát drift và tái huấn luyện định kỳ.
+- Bổ sung Explainability (SHAP) và phân tích thiên lệch.
+- Thêm benchmark lịch sử và cảnh báo suy thoái mô hình.
+
+## 12. Giấy Phép
+(Bổ sung nếu cần.)
+
+---
+
+End of README.
