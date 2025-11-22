@@ -472,12 +472,6 @@ University of Information Technology (UIT)
 
 ---
 
-### License
-
-This project is developed for educational purposes 
-
----
-
 ### Acknowledgments
 
 Special thanks to Dr. Hà Minh Tân for guidance and mentorship throughout the development of this project.
@@ -951,12 +945,6 @@ Trường Đại học Công nghệ Thông tin (UIT)
 **Liên hệ:**
 - GitHub: [MinhTuan2405](https://github.com/MinhTuan2405)
 - Email: tuannguyen.02042005@gmail.com
-
----
-
-### Giấy phép
-
-Dự án này được phát triển cho mục đích giáo dục 
 
 ---
 
