@@ -403,9 +403,15 @@ Access the web application at `http://localhost:8501`:
 3. View prediction results with confidence scores
 
 **Example Input:**
-```
-President announces new policy to reduce inflation by 50% next month
-```
+| Year | Type | Title                                                 | Date         | Content                                                                                                                                                                                          |
+| ---- | ---- | ----------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2016 | Real | Donald Trump Wins the 2016 U.S. Presidential Election | Nov 9, 2016  | Donald J. Trump won the 2016 presidential election, defeating Hillary Clinton with 304 electoral votes to 227. Clinton conceded defeat and Trump became the 45th President of the United States. |
+| 2016 | Fake | Pope Francis Endorses Donald Trump for President      | Oct 2016     | Viral posts claimed that Pope Francis officially endorsed Donald Trump for president. The Vatican denied this, stating the Pope does not support any political candidate.                        |
+| 2017 | Real | Trump Signs Executive Order to Withdraw from TPP      | Jan 23, 2017 | President Donald Trump signed an executive order withdrawing the United States from the Trans-Pacific Partnership, fulfilling a key campaign promise to renegotiate major trade deals.           |
+| 2017 | Fake | Obama Ordered Wiretapping of Trump Tower              | Mar 2017     | Articles falsely claimed Barack Obama ordered wiretapping of Trump Tower during the 2016 campaign. The FBI and intelligence agencies confirmed no such surveillance existed.                     |
+| 2017 | Real | Congress Passes Tax Cuts and Jobs Act                 | Dec 20, 2017 | Congress passed the Tax Cuts and Jobs Act, making major corporate tax reductions and changing individual income tax brackets. Trump signed it into law.                                          |
+| 2016 | Fake | Hillary Clinton Sold Weapons to ISIS                  | Sep 2016     | False claims circulated online alleging Hillary Clinton sold weapons to ISIS when she was Secretary of State. Fact-checkers confirmed there was no evidence and labeled it fabricated.           |
+
 
 ---
 
@@ -879,9 +885,15 @@ Truy cập ứng dụng web tại `http://localhost:8501`:
 3. Xem kết quả dự đoán với điểm confidence
 
 **Ví dụ Input:**
-```
-Tổng thống công bố chính sách mới giảm lạm phát 50% trong tháng tới
-```
+| Year | Type | Title                                                 | Date         | Content                                                                                                                                                                                          |
+| ---- | ---- | ----------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2016 | Real | Donald Trump Wins the 2016 U.S. Presidential Election | Nov 9, 2016  | Donald J. Trump won the 2016 presidential election, defeating Hillary Clinton with 304 electoral votes to 227. Clinton conceded defeat and Trump became the 45th President of the United States. |
+| 2016 | Fake | Pope Francis Endorses Donald Trump for President      | Oct 2016     | Viral posts claimed that Pope Francis officially endorsed Donald Trump for president. The Vatican denied this, stating the Pope does not support any political candidate.                        |
+| 2017 | Real | Trump Signs Executive Order to Withdraw from TPP      | Jan 23, 2017 | President Donald Trump signed an executive order withdrawing the United States from the Trans-Pacific Partnership, fulfilling a key campaign promise to renegotiate major trade deals.           |
+| 2017 | Fake | Obama Ordered Wiretapping of Trump Tower              | Mar 2017     | Articles falsely claimed Barack Obama ordered wiretapping of Trump Tower during the 2016 campaign. The FBI and intelligence agencies confirmed no such surveillance existed.                     |
+| 2017 | Real | Congress Passes Tax Cuts and Jobs Act                 | Dec 20, 2017 | Congress passed the Tax Cuts and Jobs Act, making major corporate tax reductions and changing individual income tax brackets. Trump signed it into law.                                          |
+| 2016 | Fake | Hillary Clinton Sold Weapons to ISIS                  | Sep 2016     | False claims circulated online alleging Hillary Clinton sold weapons to ISIS when she was Secretary of State. Fact-checkers confirmed there was no evidence and labeled it fabricated.           |
+
 
 ---
 
