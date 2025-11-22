@@ -454,9 +454,9 @@ ensemtrust/
 ### Development Team
 
 **Project Team:**
-- **Nguyễn Hà Minh Tuấn** - Data Engineer & ML Engineer
-- **Trần Phan Thanh Tùng** - Data Engineer
-- **Trần Nguyễn Đức Trung** - Data Engineer
+- **Nguyễn Hà Minh Tuấn** - Data Engineer
+- **Trần Phan Thanh Tùng** - Software Engineer
+- **Trần Nguyễn Đức Trung** - Software Engineer
 
 **Institution:**  
 University of Information Technology (UIT) - Vietnam National University Ho Chi Minh City
@@ -936,9 +936,9 @@ ensemtrust/
 ### Nhóm phát triển
 
 **Nhóm dự án:**
-- **Nguyễn Hà Minh Tuấn** - Data Engineer & ML Engineer
-- **Trần Phan Thanh Tùng** - Data Engineer
-- **Trần Nguyễn Đức Trung** - Data Engineer
+- **Nguyễn Hà Minh Tuấn** - Data Engineer
+- **Trần Phan Thanh Tùng** - Software Engineer
+- **Trần Nguyễn Đức Trung** - Software Engineer
 
 **Đơn vị:**  
 Trường Đại học Công nghệ Thông tin (UIT) - Đại học Quốc gia Thành phố Hồ Chí Minh
