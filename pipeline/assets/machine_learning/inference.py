@@ -562,6 +562,7 @@ def inference_stacking_ensemble(context: AssetExecutionContext, train_stacking_e
     description='Compare all models inference results',
     compute_kind='Python',
     group_name='ML_pipeline',
+    required_resource_keys={'minio_resource'},
     ins={
         'inference_logistic_regression': AssetIn('inference_logistic_regression'),
         'inference_svm': AssetIn('inference_svm'),

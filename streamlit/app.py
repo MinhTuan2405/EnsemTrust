@@ -64,14 +64,14 @@ st.markdown("""
 
 # --- 3. KHỞI TẠO MINIO CLIENT VÀ LOAD MODEL ---
 @st.cache_resource
-def load_model_from_minio(model_name="stacking_ensemble.pkl"):
-    """Load trained model from MinIO bucket.
+def init_minio_and_model(model_name="stacking_ensemble.pkl"):
+    """Initialize MinIO client and load trained model.
     
     Args:
         model_name: Name of the pickle file in models/model/ path.
     
     Returns:
-        Loaded sklearn model or None if failed.
+        tuple: (minio_client, model) or (None, None) if failed.
     """
     try:
         # MinIO connection config (adjust if needed)
@@ -90,15 +90,15 @@ def load_model_from_minio(model_name="stacking_ensemble.pkl"):
         model_bytes = BytesIO(response.read())
         model = pickle.load(model_bytes)
         
-        return model
+        return minio_client, model
     
     except Exception as e:
-        st.error(f"❌ Không thể load model: {e}")
-        return None
+        st.error(f"❌ Không thể load model hoặc kết nối MinIO: {e}")
+        return None, None
 
 
-# Load model at startup
-MODEL = load_model_from_minio()
+# Load MinIO client and model at startup
+MINIO_CLIENT, MODEL = init_minio_and_model()
 
 
 RESPONSE_TEMPLATES = {
@@ -187,52 +187,53 @@ def analyze_news(text):
     Returns:
         tuple: (prob, label, color, msg, icon, spoken_reply)
     """
-    if MODEL is None:
-        # Fallback nếu không load được model
-        msg = "Hệ thống chưa tải được mô hình nên không thể đưa ra đánh giá."
-        spoken = "⚠️ LỖI: Model chưa load. Hệ thống chưa thể phân tích."
-        return -1, 0.5, "LỖI: Model chưa load", "#ff0000", msg, "⚠️", spoken
+    if MODEL is None or MINIO_CLIENT is None:
+        # Fallback nếu không load được model hoặc MinIO client
+        msg = "Hệ thống chưa tải được mô hình hoặc kết nối MinIO nên không thể đưa ra đánh giá."
+        spoken = "⚠️ LỖI: Model hoặc MinIO chưa load. Hệ thống chưa thể phân tích."
+        return -1, 0.5, "LỖI: Model/MinIO chưa load", "#ff0000", msg, "⚠️", spoken
     
     try:
-        # Gọi hàm predict từ models.py
-        pred, prob = predict_fake_news(text, MODEL)
+        # Gọi hàm predict từ models.py với MinIO client để load transformers
+        pred, prob = predict_fake_news(text, MODEL, minio_client=MINIO_CLIENT)
         
         # pred và prob là arrays, lấy phần tử đầu tiên
         pred_class = int(pred[0])
-        prob_value = float(prob[0])
+        prob_value = float(prob[0])  # Xác suất của class 1 (tin thật)
         prob_percent = prob_value * 100
         
-        # Quy tắc đánh giá dựa trên xác suất tin giả
+        # Quy tắc đánh giá dựa trên độ tin cậy (xác suất tin thật)
+        # prob_value cao = tin thật, prob_value thấp = tin giả
         if prob_value >= 0.8:
-            label = "FAKE NEWS (Tin giả)"
-            color = "#ff4b4b"  # Đỏ
-            icon = "🚨"
-            category = "fake"
-        elif 0.6 <= prob_value < 0.8:
-            label = "KHẢ NĂNG CAO LÀ TIN GIẢ"
-            color = "#ff9800"  # Cam
-            icon = "⚠️"
-            category = "likely_fake"
-        elif 0.5 <= prob_value < 0.6:
-            label = "NGHI NGỜ"
-            color = "#fbc02d"  # Vàng
-            icon = "🤔"
-            category = "suspect"
-        elif 0.4 <= prob_value < 0.5:
-            label = "TRUNG LẬP"
-            color = "#9e9e9e"  # Xám
-            icon = "⚖️"
-            category = "neutral"
-        elif 0.2 <= prob_value < 0.4:
-            label = "THIÊN VỀ TIN THẬT"
-            color = "#42a5f5"  # Xanh dương
-            icon = "✅"
-            category = "likely_real"
-        else:  # prob_value < 0.2
             label = "REAL NEWS (Tin thật)"
             color = "#4caf50"  # Xanh lá
             icon = "🛡️"
             category = "real"
+        elif 0.6 <= prob_value < 0.8:
+            label = "THIÊN VỀ TIN THẬT"
+            color = "#42a5f5"  # Xanh dương
+            icon = "✅"
+            category = "likely_real"
+        elif 0.5 <= prob_value < 0.6:
+            label = "TRUNG LẬP"
+            color = "#9e9e9e"  # Xám
+            icon = "⚖️"
+            category = "neutral"
+        elif 0.4 <= prob_value < 0.5:
+            label = "NGHI NGỜ"
+            color = "#fbc02d"  # Vàng
+            icon = "🤔"
+            category = "suspect"
+        elif 0.2 <= prob_value < 0.4:
+            label = "KHẢ NĂNG CAO LÀ TIN GIẢ"
+            color = "#ff9800"  # Cam
+            icon = "⚠️"
+            category = "likely_fake"
+        else:  # prob_value < 0.2
+            label = "FAKE NEWS (Tin giả)"
+            color = "#ff4b4b"  # Đỏ
+            icon = "🚨"
+            category = "fake"
 
         msg = random.choice(RESPONSE_TEMPLATES[category]).format(
             prob_percent=prob_percent,
@@ -283,7 +284,7 @@ if prompt := st.chat_input("Điền hoặc Dán nội dung tin tức vào đây.
             time.sleep(1) # Delay giả lập
             
             pred_class, prob, label, color, msg, icon, spoken_reply = analyze_news(prompt)
-            pred_label = "Tin giả (Fake)" if pred_class == 1 else "Tin thật (Real)"
+            pred_label = "Tin thật (Real)" if pred_class == 1 else "Tin giả (Fake)"
             reply_html = f"<div style='margin-bottom:10px;'>{spoken_reply}</div>"
             
             # Giao diện kết quả dạng thẻ (Card) tối giản
@@ -292,7 +293,7 @@ if prompt := st.chat_input("Điền hoặc Dán nội dung tin tức vào đây.
                 <h3 style="color: {color}; margin: 0; font-size: 1.2rem;">{icon} {label}</h3>
                 <div style="margin-top: 10px; font-size: 0.9rem; color: #ddd;">
                     <strong>Dự đoán (Predict):</strong> {pred_label} (Class: {pred_class})<br>
-                    <strong>Xác suất tin giả (Probability):</strong> {prob:.4f} ({prob*100:.2f}%)
+                    <strong>Độ tin cậy (Confidence):</strong> {prob:.4f} ({prob*100:.2f}%)
                 </div>
                 <p style="margin-top: 10px; font-style: italic; color: #bbb;">"{msg}"</p>
             </div>
