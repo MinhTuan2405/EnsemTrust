@@ -19,40 +19,38 @@ EnsemTrust is an end-to-end fake news detection platform combining modern data e
 
 ## 3. Architecture
 ### 3.1 Overview
-(See `image/architecture_overview.png`)
+![Architecture Overview](image/architecture_overview.png)
 
 Components:
-- Dagster: Orchestrates asset-based pipelines (data preparation, feature engineering, model training, inference validation).
-- MinIO: Acts as object storage & layered data lake (landing, bronze, silver, gold) and model artifact repository.
-- Postgres: Metadata store for Dagster, application metastore (Hive/Metabase), and structured persistence.
-- Hive Metastore + Trino: SQL query layer over lakehouse data.
-- Spark Cluster: Distributed processing for heavy transformations and initial dataset splits.
-- ML Layer: Feature engineering + model training + evaluation (Python / scikit-learn / LightGBM / PyTorch embeddings).
-- Streamlit App: Serves interactive classification endpoint with calibrated confidence outputs.
-- Metabase / CloudBeaver: BI and data exploration interfaces.
+- Dagster orchestrates asset-based pipelines (data preparation, feature engineering, model training, inference validation).
+- MinIO provides layered lake storage (landing, bronze, silver, gold) and model artifacts.
+- Postgres stores Dagster metadata and Hive/Metabase schemas.
+- Hive Metastore + Trino expose SQL access over object storage.
+- Spark executes distributed transformations and dataset splits.
+- ML layer performs feature engineering, training, evaluation.
+- Streamlit serves interactive inference.
+- Metabase / CloudBeaver enable BI exploration.
 
 ### 3.2 Data Lineage
-(See `image/dagster_lineage_overview.svg` and layer visuals `image/bronze_layer.svg`, `image/silver_layer.svg`, `image/gold_layer.svg`)
+![Dagster Lineage Overview](image/dagster_lineage_overview.svg)
+![Bronze Layer](image/bronze_layer.svg) ![Silver Layer](image/silver_layer.svg) ![Gold Layer](image/gold_layer.svg)
 
-Flow Description:
-1. Landing → Bronze: Raw ingested news articles (title, text, subject, label) stored unmodified. Versioning enabled.
-2. Bronze → Silver: Cleaning, deduplication, consolidation of content fields; creation of unified `content` textual feature.
-3. Silver → Feature Layer: Splitting into train/validation/test (60/20/20 stratified), plus multi-modal feature extraction:
-   - Handcrafted linguistic features (length stats, lexical richness, readability metrics, etc.).
-   - TF-IDF (vocabulary size configurable) followed by SVD (latent semantic compression, 300 components).
-   - Sentence embeddings (all-MiniLM-L6-v2) with optional GPU acceleration.
-4. Feature Combination: Concatenation of embeddings + reduced TF-IDF matrix + handcrafted features.
-5. Model Training: Three base learners (Logistic Regression, Linear SVM with probability calibration, LightGBM) produce metrics and plots. A stacking ensemble uses these base models as estimators with a Logistic Regression meta-learner.
-6. Inference Assets: Sample test cases exercise each trained model; comparative analysis and probability distributions saved as plots.
-7. Serving: Best ensemble model persisted as `best_model.pkl` for the Streamlit application.
+Flow:
+1. Landing → Bronze: raw records versioned.
+2. Bronze → Silver: cleaning, deduplication, unified `content` field.
+3. Silver → Feature: stratified split (60/20/20) + multi-feature extraction (handcrafted, TF-IDF+SVD, embeddings).
+4. Combination: concatenate embeddings + reduced TF-IDF + handcrafted.
+5. Training: base models (LogReg, Linear SVM calibrated, LightGBM) + stacking ensemble.
+6. Inference: test cases & comparative plots.
+7. Serving: stacking ensemble persisted as `stacking_ensemble.pkl` for Streamlit.
 
 ### 3.3 Machine Learning Layer
-(See `image/machine_learning_layer.svg`)
-- Calibration: LinearSVC wrapped with `CalibratedClassifierCV` for probabilistic output, improving threshold interpretability.
-- Early Stopping / Validation: LightGBM integrates validation set metrics (`eval_set`) to prevent overfitting and adapt to GPU/CPU automatically.
-- Artifact Paths:
+![Machine Learning Layer](image/machine_learning_layer.svg)
+- Calibration: LinearSVC + `CalibratedClassifierCV` for probabilities.
+- Validation: LightGBM uses `eval_set` (GPU with CPU fallback).
+- Artifacts:
   - Models: `models/model/*.pkl`
-  - Transformers: `models/transformers/{tfidf_vectorizer.pkl, svd_transformer.pkl}`
+  - Transformers: `models/transformers/tfidf_vectorizer.pkl`, `models/transformers/svd_transformer.pkl`
   - Plots: `models/plots/*performance.png`, `models/plots/inference_*.png`
 
 ## 4. Core Technologies
@@ -60,35 +58,14 @@ Category | Stack
 ---------|------
 Orchestration | Dagster
 Storage & Lake | MinIO (object store), versioned buckets
-### 3.1 Overview
-![Architecture Overview](image/architecture_overview.png)
+Metadata / Relational | Postgres
+Query Engine | Trino + Hive Metastore
 Distributed Processing | Apache Spark (Master + Workers)
 ML / NLP | scikit-learn, LightGBM, SentenceTransformers, PyTorch
-### 3.2 Data Lineage
-![Dagster Lineage Overview](image/dagster_lineage_overview.svg)
-![Bronze Layer](image/bronze_layer.svg) ![Silver Layer](image/silver_layer.svg) ![Gold Layer](image/gold_layer.svg)
-BI & Exploration | CloudBeaver (SQL GUI), Metabase (analytics)
+Feature Extraction | TF-IDF, SVD, handcrafted metrics, MiniLM embeddings
+Visualization | Matplotlib, Seaborn, Streamlit UI, Metabase dashboards
+BI & Exploration | CloudBeaver, Metabase
 Infrastructure | Docker, docker-compose, optional NVIDIA GPU runtime
-### 3.3 Machine Learning Layer
-![Machine Learning Layer](image/machine_learning_layer.svg)
-- Docker (>= 24.x) & Docker Compose plugin.
-7. Serving: Stacking ensemble model persisted as `stacking_ensemble.pkl` and consumed directly by the Streamlit application.
-  - NVIDIA GPU with recent driver.
-5. Train ensemble: `train_stacking_ensemble` (produces `stacking_ensemble.pkl`)
-- Adequate system resources (recommend ≥16GB RAM for embedding + LightGBM training).
-- Loads `stacking_ensemble.pkl`.
-
-Retrain by re-materializing training assets. The ensemble asset updates `stacking_ensemble.pkl` consumed by Streamlit.
-### 6.1 Clone Repository
-### Development Team
-- **Nguyễn Hà Minh Tuấn**
-- **Trần Phan Thanh Tùng**
-- **Trần Nguyễn Đức Trung**
-
-Affiliation: **University of Information Technology (UIT)** – **Faculty of Information Engineering & Sciences**.
-
-### Advisor
-- **Dr. Hà Minh Tân** (Faculty of Information Engineering and Sciences)
 ```bash
 <!-- Roadmap and License sections intentionally removed per project owner request -->
 # Install container toolkit
@@ -141,7 +118,7 @@ Open Dagster UI → select ML asset group (`ML_pipeline`) → materialize assets
 2. Feature engineering assets: `handcrafted_feature_engineering`, `tfidf_svd_feature_engineering`, `sentence_transformer_feature_engineering`
 3. Combine features → `combine_features`
 4. Train models: `train_logistic_regression`, `train_svm`, `train_lightgbm`
-5. Train ensemble: `train_stacking_ensemble` (produces `best_model.pkl`)
+5. Train ensemble: `train_stacking_ensemble` (produces `stacking_ensemble.pkl`)
 6. Inference assets: `inference_logistic_regression`, `inference_svm`, `inference_lightgbm`, `inference_stacking_ensemble`, `compare_model_inference`
 
 ### 7.2 Inspect Artifacts
@@ -152,7 +129,7 @@ In MinIO bucket `models`:
 
 ### 7.3 Use Streamlit Application
 Navigate to http://localhost:8501 and input any news text. The app:
-- Loads `best_model.pkl`.
+- Loads `stacking_ensemble.pkl`.
 - Computes features using saved transformers.
 - Returns prediction: class 1 = Real, class 0 = Fake.
 - Displays calibrated confidence (probability of Real News).
@@ -163,18 +140,18 @@ Navigate to http://localhost:8501 and input any news text. The app:
 - SentenceTransformer embeddings utilize CUDA if available.
 
 ### 7.5 Updating Models
-Retrain by re-materializing training assets. The ensemble asset updates `best_model.pkl` consumed by Streamlit.
+Retrain by re-materializing training assets. The ensemble asset updates `stacking_ensemble.pkl` consumed by Streamlit.
 
 ## 8. Authors & Acknowledgements
 ### Development Team
-- Nguyễn Hà Minh Tuấn
-- Trần Phan Thanh Tùng
-- Trần Nguyễn Đức Trung
+- **Nguyễn Hà Minh Tuấn**
+- **Trần Phan Thanh Tùng**
+- **Trần Nguyễn Đức Trung**
 
-Affiliation: University of Information Technology (UIT) – Faculty of Information Engineering & Sciences.
+Affiliation: **University of Information Technology (UIT)** – **Faculty of Information Engineering & Sciences**.
 
 ### Advisor
-- Dr. Hà Minh Tân (Faculty of Information Engineering and Sciences)
+- **Dr. Hà Minh Tân** (Faculty of Information Engineering and Sciences)
 
 ## 9. Roadmap (Potential Enhancements)
 - Add Kafka ingestion back (currently commented) for streaming pipelines.
@@ -209,7 +186,7 @@ EnsemTrust là nền tảng phát hiện tin giả toàn diện, kết hợp k�
 
 ## 3. Kiến Trúc
 ### 3.1 Tổng Quan
-Xem `image/architecture_overview.png`.
+![Tổng quan kiến trúc](image/architecture_overview.png)
 
 Thành phần:
 - Dagster: điều phối pipeline dạng asset.
@@ -222,7 +199,8 @@ Thành phần:
 - Metabase / CloudBeaver: phân tích và khám phá dữ liệu.
 
 ### 3.2 Data Lineage
-Xem `image/dagster_lineage_overview.svg`, `image/bronze_layer.svg`, `image/silver_layer.svg`, `image/gold_layer.svg`.
+![Tổng quan lineage Dagster](image/dagster_lineage_overview.svg)
+![Lớp Bronze](image/bronze_layer.svg) ![Lớp Silver](image/silver_layer.svg) ![Lớp Gold](image/gold_layer.svg)
 
 Luồng:
 1. Landing → Bronze: dữ liệu thô (title, text, subject, label) được version hóa.
@@ -234,7 +212,7 @@ Luồng:
 7. Phục Vụ: `best_model.pkl` cho ứng dụng Streamlit.
 
 ### 3.3 Lớp Học Máy
-Xem `image/machine_learning_layer.svg`.
+![Lớp học máy](image/machine_learning_layer.svg)
 - Calibration: LinearSVC bọc bởi `CalibratedClassifierCV` trả xác suất tin cậy.
 - LightGBM: dùng tập validation (`eval_set`) chống overfitting, tự nhận GPU.
 - Artifact:
@@ -306,12 +284,12 @@ docker compose up -d
 2. Chạy các asset đặc trưng: `handcrafted_feature_engineering`, `tfidf_svd_feature_engineering`, `sentence_transformer_feature_engineering`.
 3. Kết hợp: `combine_features`.
 4. Huấn luyện: `train_logistic_regression`, `train_svm`, `train_lightgbm`.
-5. Ensemble: `train_stacking_ensemble` (tạo `best_model.pkl`).
+5. Ensemble: `train_stacking_ensemble` (lưu `stacking_ensemble.pkl`).
 6. Suy luận: `inference_*` và `compare_model_inference`.
 
 ## 8. Ứng Dụng Streamlit
 Truy cập http://localhost:8501, nhập văn bản. Hệ thống:
-- Tải `best_model.pkl`.
+- Tải `stacking_ensemble.pkl`.
 - Dùng transformer đã lưu để trích xuất đặc trưng.
 - Trả kết quả: lớp 1 = Tin Thật, lớp 0 = Tin Giả.
 - Hiển thị độ tin cậy (xác suất tin thật).
@@ -322,14 +300,14 @@ Truy cập http://localhost:8501, nhập văn bản. Hệ thống:
 
 ## 10. Tác Giả & Cố Vấn
 Nhóm phát triển:
-- Nguyễn Hà Minh Tuấn
-- Trần Phan Thanh Tùng
-- Trần Nguyễn Đức Trung
+- **Nguyễn Hà Minh Tuấn**
+- **Trần Phan Thanh Tùng**
+- **Trần Nguyễn Đức Trung**
 
-Thuộc Trường Đại học Công nghệ Thông tin (UIT) – Khoa Khoa học Kĩ thuật Thông tin.
+Thuộc **Trường Đại học Công nghệ Thông tin (UIT)** – **Khoa Khoa học Kĩ thuật Thông tin**.
 
 Người hướng dẫn:
-- Tiến sĩ Hà Minh Tân (Giảng viên Khoa Khoa học Kĩ thuật Thông tin)
+- **Tiến sĩ Hà Minh Tân** (Giảng viên Khoa Khoa học Kĩ thuật Thông tin)
 
 ## 11. Định Hướng Tương Lai
 - Khôi phục pipeline streaming Kafka.
