@@ -49,6 +49,7 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
       - AWS_S3_ENDPOINT=${AWS_S3_ENDPOINT}
+      - CUDA_VISIBLE_DEVICES=0
     volumes:
       - ./workspace.yaml:/opt/dagster/dagster_home/dagster-project/workspace.yaml:ro
       - ./pipeline:/opt/dagster/dagster_home/dagster-project/pipeline
@@ -63,6 +64,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     restart: on-failure
 
   minio:

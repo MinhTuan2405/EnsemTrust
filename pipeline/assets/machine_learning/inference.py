@@ -1,4 +1,4 @@
-from dagster import asset, AssetExecutionContext, AssetIn, Output
+from dagster import asset, AssetExecutionContext, AssetIn, Output, MetadataValue
 from pipeline.utils.models import predict_fake_news
 import pickle
 from io import BytesIO
@@ -47,6 +47,9 @@ def inference_logistic_regression(context: AssetExecutionContext, train_logistic
     # Use the trained model passed from training asset
     model = train_logistic_regression
     
+    # Get MinIO client
+    minio_client = context.resources.minio_resource
+    
     # Prepare results
     results = []
     
@@ -54,7 +57,7 @@ def inference_logistic_regression(context: AssetExecutionContext, train_logistic
         context.log.info(f"Case {i}: {text[:50]}...")
         
         # Predict
-        pred, prob = predict_fake_news([text], model)
+        pred, prob = predict_fake_news([text], model, minio_client)
         prediction = "REAL" if pred[0] == 1 else "FAKE"
         probability = float(prob[0])
         
@@ -109,10 +112,27 @@ def inference_logistic_regression(context: AssetExecutionContext, train_logistic
     
     plt.tight_layout()
     
-    # Save plot to metadata
+    # Save plot to buffer and MinIO
+    minio_client = context.resources.minio_resource
+    bucket_name = "models"
+    
     plot_buffer = BytesIO()
     plt.savefig(plot_buffer, format='png', dpi=150, bbox_inches='tight')
     plot_buffer.seek(0)
+    
+    # Save to MinIO
+    plot_path = "plots/inference_logistic_regression.png"
+    minio_client.put_object(
+        bucket_name,
+        plot_path,
+        plot_buffer,
+        length=plot_buffer.getbuffer().nbytes,
+        content_type="image/png"
+    )
+    context.log.info(f"Saved plot to s3://{bucket_name}/{plot_path}")
+    
+    plot_buffer.seek(0)
+    plt.close()
     
     # Calculate summary statistics
     avg_prob_fake = df[df['expected_type'] == 'fake']['probability_real'].mean()
@@ -136,7 +156,8 @@ def inference_logistic_regression(context: AssetExecutionContext, train_logistic
             "avg_prob_real_cases": float(avg_prob_real),
             "avg_prob_neutral_cases": float(avg_prob_neutral),
             "avg_prob_borderline_cases": float(avg_prob_borderline),
-            "plot": {"png": plot_buffer.getvalue()}
+            "plot_path": f"s3://{bucket_name}/{plot_path}",
+            "plot": MetadataValue.md(f"![Logistic Regression Inference](data:image/png;base64,{__import__('base64').b64encode(plot_buffer.getvalue()).decode()})")
         }
     )
 
@@ -158,6 +179,9 @@ def inference_svm(context: AssetExecutionContext, train_svm):
     # Use the trained model passed from training asset
     model = train_svm
     
+    # Get MinIO client
+    minio_client = context.resources.minio_resource
+    
     # Prepare results
     results = []
     
@@ -165,7 +189,7 @@ def inference_svm(context: AssetExecutionContext, train_svm):
         context.log.info(f"Case {i}: {text[:50]}...")
         
         # Predict
-        pred, prob = predict_fake_news([text], model)
+        pred, prob = predict_fake_news([text], model, minio_client)
         prediction = "REAL" if pred[0] == 1 else "FAKE"
         probability = float(prob[0])
         
@@ -220,10 +244,27 @@ def inference_svm(context: AssetExecutionContext, train_svm):
     
     plt.tight_layout()
     
-    # Save plot to metadata
+    # Save plot to buffer and MinIO
+    minio_client = context.resources.minio_resource
+    bucket_name = "models"
+    
     plot_buffer = BytesIO()
     plt.savefig(plot_buffer, format='png', dpi=150, bbox_inches='tight')
     plot_buffer.seek(0)
+    
+    # Save to MinIO
+    plot_path = "plots/inference_svm.png"
+    minio_client.put_object(
+        bucket_name,
+        plot_path,
+        plot_buffer,
+        length=plot_buffer.getbuffer().nbytes,
+        content_type="image/png"
+    )
+    context.log.info(f"Saved plot to s3://{bucket_name}/{plot_path}")
+    
+    plot_buffer.seek(0)
+    plt.close()
     
     # Calculate summary statistics
     avg_prob_fake = df[df['expected_type'] == 'fake']['probability_real'].mean()
@@ -247,7 +288,8 @@ def inference_svm(context: AssetExecutionContext, train_svm):
             "avg_prob_real_cases": float(avg_prob_real),
             "avg_prob_neutral_cases": float(avg_prob_neutral),
             "avg_prob_borderline_cases": float(avg_prob_borderline),
-            "plot": {"png": plot_buffer.getvalue()}
+            "plot_path": f"s3://{bucket_name}/{plot_path}",
+            "plot": MetadataValue.md(f"![SVM Inference](data:image/png;base64,{__import__('base64').b64encode(plot_buffer.getvalue()).decode()})")
         }
     )
 
@@ -269,6 +311,9 @@ def inference_lightgbm(context: AssetExecutionContext, train_lightgbm):
     # Use the trained model passed from training asset
     model = train_lightgbm
     
+    # Get MinIO client
+    minio_client = context.resources.minio_resource
+    
     # Prepare results
     results = []
     
@@ -276,7 +321,7 @@ def inference_lightgbm(context: AssetExecutionContext, train_lightgbm):
         context.log.info(f"Case {i}: {text[:50]}...")
         
         # Predict
-        pred, prob = predict_fake_news([text], model)
+        pred, prob = predict_fake_news([text], model, minio_client)
         prediction = "REAL" if pred[0] == 1 else "FAKE"
         probability = float(prob[0])
         
@@ -331,10 +376,27 @@ def inference_lightgbm(context: AssetExecutionContext, train_lightgbm):
     
     plt.tight_layout()
     
-    # Save plot to metadata
+    # Save plot to buffer and MinIO
+    minio_client = context.resources.minio_resource
+    bucket_name = "models"
+    
     plot_buffer = BytesIO()
     plt.savefig(plot_buffer, format='png', dpi=150, bbox_inches='tight')
     plot_buffer.seek(0)
+    
+    # Save to MinIO
+    plot_path = "plots/inference_lightgbm.png"
+    minio_client.put_object(
+        bucket_name,
+        plot_path,
+        plot_buffer,
+        length=plot_buffer.getbuffer().nbytes,
+        content_type="image/png"
+    )
+    context.log.info(f"Saved plot to s3://{bucket_name}/{plot_path}")
+    
+    plot_buffer.seek(0)
+    plt.close()
     
     # Calculate summary statistics
     avg_prob_fake = df[df['expected_type'] == 'fake']['probability_real'].mean()
@@ -358,7 +420,8 @@ def inference_lightgbm(context: AssetExecutionContext, train_lightgbm):
             "avg_prob_real_cases": float(avg_prob_real),
             "avg_prob_neutral_cases": float(avg_prob_neutral),
             "avg_prob_borderline_cases": float(avg_prob_borderline),
-            "plot": {"png": plot_buffer.getvalue()}
+            "plot_path": f"s3://{bucket_name}/{plot_path}",
+            "plot": MetadataValue.md(f"![LightGBM Inference](data:image/png;base64,{__import__('base64').b64encode(plot_buffer.getvalue()).decode()})")
         }
     )
 
@@ -380,6 +443,9 @@ def inference_stacking_ensemble(context: AssetExecutionContext, train_stacking_e
     # Use the trained model passed from training asset
     model = train_stacking_ensemble
     
+    # Get MinIO client
+    minio_client = context.resources.minio_resource
+    
     # Prepare results
     results = []
     
@@ -387,7 +453,7 @@ def inference_stacking_ensemble(context: AssetExecutionContext, train_stacking_e
         context.log.info(f"Case {i}: {text[:50]}...")
         
         # Predict
-        pred, prob = predict_fake_news([text], model)
+        pred, prob = predict_fake_news([text], model, minio_client)
         prediction = "REAL" if pred[0] == 1 else "FAKE"
         probability = float(prob[0])
         
@@ -442,10 +508,27 @@ def inference_stacking_ensemble(context: AssetExecutionContext, train_stacking_e
     
     plt.tight_layout()
     
-    # Save plot to metadata
+    # Save plot to buffer and MinIO
+    minio_client = context.resources.minio_resource
+    bucket_name = "models"
+    
     plot_buffer = BytesIO()
     plt.savefig(plot_buffer, format='png', dpi=150, bbox_inches='tight')
     plot_buffer.seek(0)
+    
+    # Save to MinIO
+    plot_path = "plots/inference_stacking_ensemble.png"
+    minio_client.put_object(
+        bucket_name,
+        plot_path,
+        plot_buffer,
+        length=plot_buffer.getbuffer().nbytes,
+        content_type="image/png"
+    )
+    context.log.info(f"Saved plot to s3://{bucket_name}/{plot_path}")
+    
+    plot_buffer.seek(0)
+    plt.close()
     
     # Calculate summary statistics
     avg_prob_fake = df[df['expected_type'] == 'fake']['probability_real'].mean()
@@ -469,7 +552,8 @@ def inference_stacking_ensemble(context: AssetExecutionContext, train_stacking_e
             "avg_prob_real_cases": float(avg_prob_real),
             "avg_prob_neutral_cases": float(avg_prob_neutral),
             "avg_prob_borderline_cases": float(avg_prob_borderline),
-            "plot": {"png": plot_buffer.getvalue()}
+            "plot_path": f"s3://{bucket_name}/{plot_path}",
+            "plot": MetadataValue.md(f"![Stacking Ensemble Inference](data:image/png;base64,{__import__('base64').b64encode(plot_buffer.getvalue()).decode()})")
         }
     )
 
@@ -595,12 +679,28 @@ def compare_model_inference(context: AssetExecutionContext,
     
     plt.tight_layout()
     
-    # Save plot to metadata
+    # Save plot to buffer
     plot_buffer = BytesIO()
     plt.savefig(plot_buffer, format='png', dpi=150, bbox_inches='tight')
     plot_buffer.seek(0)
     
-    # Calculate overall agreement
+    # Save plot to MinIO
+    minio_client = context.resources.minio_resource
+    bucket_name = "models"
+    plot_path = "plots/model_agreement_analysis.png"
+    minio_client.put_object(
+        bucket_name,
+        plot_path,
+        plot_buffer,
+        length=plot_buffer.getbuffer().nbytes,
+        content_type="image/png"
+    )
+    context.log.info(f"Saved plot to s3://{bucket_name}/{plot_path}")
+    
+    plot_buffer.seek(0)  # Reset buffer for metadata
+    plt.close()
+    
+    # Calculate full agreement rate
     total_agreement = (
         (df_lr['predicted_label'] == df_svm['predicted_label']) &
         (df_lr['predicted_label'] == df_lgb['predicted_label']) &
@@ -620,6 +720,7 @@ def compare_model_inference(context: AssetExecutionContext,
             "total_cases": len(df_lr),
             "full_agreement": int(total_agreement),
             "full_agreement_rate": float(total_agreement / len(df_lr) * 100),
-            "plot": {"png": plot_buffer.getvalue()}
+            "plot_path": f"s3://{bucket_name}/{plot_path}",
+            "plot": MetadataValue.md(f"![Model Agreement Analysis](data:image/png;base64,{__import__('base64').b64encode(plot_buffer.getvalue()).decode()})")
         }
     )

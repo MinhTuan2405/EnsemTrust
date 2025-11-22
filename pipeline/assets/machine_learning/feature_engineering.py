@@ -4,8 +4,6 @@ from datetime import datetime
 from pyspark.sql.functions import col, coalesce, lit, concat_ws
 from sklearn.model_selection import train_test_split
 from pipeline.utils.feature_engineer import handcrafted_features, encode_texts_st, combine, create_tfidf_vectorizer, create_svd_transformer
-import numpy as np
-import pandas as pd
 import pickle
 from io import BytesIO
 

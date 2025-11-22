@@ -8,6 +8,7 @@ stacking ensemble builder, model evaluation, and inference pipeline.
 import os
 import pandas as pd
 from dotenv import load_dotenv
+import torch
 
 from sklearn.metrics import classification_report, accuracy_score, roc_auc_score
 from sklearn.svm import SVC
@@ -30,6 +31,10 @@ except ImportError:  # optional dependency
 
 load_dotenv()
 RANDOM_STATE = int(os.getenv('RANDOM_STATE', 42))
+
+# GPU detection
+USE_GPU = torch.cuda.is_available()
+DEVICE = "cuda" if USE_GPU else "cpu"
 
 
 
@@ -68,6 +73,8 @@ def SVM_model():
 def LightGBM_model():
     """Return a LightGBM classifier with reasonable defaults for binary classification.
     
+    Automatically uses GPU if available (CUDA-enabled GPU detected).
+    
     Returns:
         LGBMClassifier: Configured LightGBM binary classifier.
         
@@ -77,16 +84,23 @@ def LightGBM_model():
     if LGBMClassifier is None:
         raise ImportError("lightgbm is not installed. Please add it to your dependencies.")
 
-    return LGBMClassifier(
-        n_estimators=300,
-        learning_rate=0.05,
-        max_depth=-1,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        objective="binary",
-        random_state=RANDOM_STATE,
-        n_jobs=-1,
-    )
+    params = {
+        "n_estimators": 300,
+        "learning_rate": 0.05,
+        "max_depth": -1,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "objective": "binary",
+        "random_state": RANDOM_STATE,
+        "n_jobs": -1,
+    }
+    
+    # Enable GPU if available
+    if USE_GPU:
+        params["device"] = "gpu"
+        params["gpu_use_dp"] = False  # Use single precision for speed
+    
+    return LGBMClassifier(**params)
 
 
 def logisticRegression_model():
@@ -143,7 +157,7 @@ def stacking_ensemble_model(estimators, final_estimator=None):
     )
 
 
-def predict_fake_news(text_list, model):
+def predict_fake_news(text_list, model, minio_client=None):
     """Predict fake news probability for given text(s).
     
     Applies full feature engineering pipeline (handcrafted + TF-IDF+SVD + embeddings)
@@ -152,31 +166,48 @@ def predict_fake_news(text_list, model):
     Args:
         text_list: Single text string or list of text strings.
         model: Trained sklearn classifier with predict_proba method.
+        minio_client: MinIO client to load pre-fitted transformers. If None, creates new transformers (not recommended).
     
     Returns:
         tuple: (predictions, probabilities)
             - predictions: Binary predictions (0=real, 1=fake) as numpy array.
             - probabilities: Probability of fake news (class 1) as numpy array.
-    
-    Note:
-        This function creates new transformer instances (TF-IDF, SVD) each time.
-        For production, load pre-fitted transformers from MinIO instead.
     """
+    import pickle
+    from io import BytesIO
+    
     if isinstance(text_list, str):
         text_list = [text_list]
 
-    # Initialize transformers (should load from MinIO in production)
-    svd = create_svd_transformer()
-    tfidf = create_tfidf_vectorizer()
+    # Load pre-fitted transformers from MinIO
+    if minio_client is not None:
+        try:
+            bucket_name = "models"
+            
+            # Load TF-IDF vectorizer
+            tfidf_obj = minio_client.get_object(bucket_name, "transformers/tfidf_vectorizer.pkl")
+            tfidf = pickle.load(BytesIO(tfidf_obj.read()))
+            
+            # Load SVD transformer
+            svd_obj = minio_client.get_object(bucket_name, "transformers/svd_transformer.pkl")
+            svd = pickle.load(BytesIO(svd_obj.read()))
+        except Exception as e:
+            print(f"Warning: Failed to load transformers from MinIO: {e}. Creating new ones.")
+            tfidf = create_tfidf_vectorizer()
+            svd = create_svd_transformer()
+    else:
+        # Fallback: create new transformers (not recommended for production)
+        tfidf = create_tfidf_vectorizer()
+        svd = create_svd_transformer()
 
     series = pd.Series(text_list)
 
     # Extract handcrafted features
     hand = handcrafted_features(series)
 
-    # Extract TF-IDF + SVD features
-    tfidf_vec = tfidf.fit_transform(series)
-    svd_vec = svd.fit_transform(tfidf_vec)
+    # Extract TF-IDF + SVD features (use transform, not fit_transform)
+    tfidf_vec = tfidf.transform(series)
+    svd_vec = svd.transform(tfidf_vec)
 
     # Extract sentence embeddings
     emb = encode_texts_st(text_list)

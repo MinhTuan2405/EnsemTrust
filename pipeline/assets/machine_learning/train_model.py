@@ -1,4 +1,4 @@
-from dagster import asset, AssetExecutionContext, AssetIn, Output
+from dagster import asset, AssetExecutionContext, AssetIn, Output, MetadataValue
 from pipeline.utils.models import (
     SVM_model, 
     logisticRegression_model, 
@@ -124,17 +124,32 @@ def train_logistic_regression(context: AssetExecutionContext, combine_features):
     
     plt.tight_layout()
     
-    # Save plot to metadata for Dagster UI display
+    # Save plot to buffer
     plot_buffer = BytesIO()
     plt.savefig(plot_buffer, format='png', dpi=150, bbox_inches='tight')
     plot_buffer.seek(0)
+    
+    # Save plot to MinIO
+    plot_path = "plots/logistic_regression_performance.png"
+    minio_client.put_object(
+        bucket_name,
+        plot_path,
+        plot_buffer,
+        length=plot_buffer.getbuffer().nbytes,
+        content_type="image/png"
+    )
+    context.log.info(f"Saved plot to s3://{bucket_name}/{plot_path}")
+    
+    plot_buffer.seek(0)  # Reset buffer for metadata
+    plt.close()
     
     return Output(
         value=model,
         metadata={
             "model_type": "LogisticRegression",
             "model_path": f"s3://{bucket_name}/{model_path}",
-            "plot": {"png": plot_buffer.getvalue()},
+            "plot_path": f"s3://{bucket_name}/{plot_path}",
+            "plot": MetadataValue.md(f"![Logistic Regression Performance](data:image/png;base64,{__import__('base64').b64encode(plot_buffer.getvalue()).decode()})"),
             "train_accuracy": float(train_metrics['accuracy']),
             "train_auc": float(train_metrics['auc']),
             "val_accuracy": float(val_metrics['accuracy']),
@@ -259,17 +274,32 @@ def train_svm(context: AssetExecutionContext, combine_features):
     
     plt.tight_layout()
     
-    # Save plot to metadata for Dagster UI display
+    # Save plot to buffer
     plot_buffer = BytesIO()
     plt.savefig(plot_buffer, format='png', dpi=150, bbox_inches='tight')
     plot_buffer.seek(0)
+    
+    # Save plot to MinIO
+    plot_path = "plots/svm_performance.png"
+    minio_client.put_object(
+        bucket_name,
+        plot_path,
+        plot_buffer,
+        length=plot_buffer.getbuffer().nbytes,
+        content_type="image/png"
+    )
+    context.log.info(f"Saved plot to s3://{bucket_name}/{plot_path}")
+    
+    plot_buffer.seek(0)  # Reset buffer for metadata
+    plt.close()
     
     return Output(
         value=model,
         metadata={
             "model_type": "SVM",
             "model_path": f"s3://{bucket_name}/{model_path}",
-            "plot": {"png": plot_buffer.getvalue()},
+            "plot_path": f"s3://{bucket_name}/{plot_path}",
+            "plot": MetadataValue.md(f"![SVM Performance](data:image/png;base64,{__import__('base64').b64encode(plot_buffer.getvalue()).decode()})"),
             "train_accuracy": float(train_metrics['accuracy']),
             "train_auc": float(train_metrics['auc']),
             "val_accuracy": float(val_metrics['accuracy']),
@@ -307,13 +337,38 @@ def train_lightgbm(context: AssetExecutionContext, combine_features):
     
     # Create and train model with validation set for early stopping
     model = LightGBM_model()
-    model.fit(
-        X_train, y_train,
-        eval_set=[(X_val, y_val)],
-        eval_metric='auc'
-    )
     
-    context.log.info('Model training completed')
+    try:
+        model.fit(
+            X_train, y_train,
+            eval_set=[(X_val, y_val)],
+            eval_metric='auc'
+        )
+        context.log.info('Model training completed (GPU mode)')
+    except Exception as e:
+        if 'OpenCL' in str(e) or 'GPU' in str(e):
+            context.log.warning(f'GPU training failed: {e}. Falling back to CPU...')
+            # Recreate model without GPU
+            from pipeline.utils.models import LGBMClassifier, RANDOM_STATE
+            model = LGBMClassifier(
+                n_estimators=300,
+                learning_rate=0.05,
+                max_depth=-1,
+                subsample=0.8,
+                colsample_bytree=0.8,
+                objective="binary",
+                random_state=RANDOM_STATE,
+                n_jobs=-1,
+                device='cpu'
+            )
+            model.fit(
+                X_train, y_train,
+                eval_set=[(X_val, y_val)],
+                eval_metric='auc'
+            )
+            context.log.info('Model training completed (CPU fallback mode)')
+        else:
+            raise
     
     # Evaluate on all sets
     train_metrics = evaluate_model(model, X_train, y_train, "Train")
@@ -398,17 +453,32 @@ def train_lightgbm(context: AssetExecutionContext, combine_features):
     
     plt.tight_layout()
     
-    # Save plot to metadata for Dagster UI display
+    # Save plot to buffer
     plot_buffer = BytesIO()
     plt.savefig(plot_buffer, format='png', dpi=150, bbox_inches='tight')
     plot_buffer.seek(0)
+    
+    # Save plot to MinIO
+    plot_path = "plots/lightgbm_performance.png"
+    minio_client.put_object(
+        bucket_name,
+        plot_path,
+        plot_buffer,
+        length=plot_buffer.getbuffer().nbytes,
+        content_type="image/png"
+    )
+    context.log.info(f"Saved plot to s3://{bucket_name}/{plot_path}")
+    
+    plot_buffer.seek(0)  # Reset buffer for metadata
+    plt.close()
     
     return Output(
         value=model,
         metadata={
             "model_type": "LightGBM",
             "model_path": f"s3://{bucket_name}/{model_path}",
-            "plot": {"png": plot_buffer.getvalue()},
+            "plot_path": f"s3://{bucket_name}/{plot_path}",
+            "plot": MetadataValue.md(f"![LightGBM Performance](data:image/png;base64,{__import__('base64').b64encode(plot_buffer.getvalue()).decode()})"),
             "train_accuracy": float(train_metrics['accuracy']),
             "train_auc": float(train_metrics['auc']),
             "val_accuracy": float(val_metrics['accuracy']),
@@ -548,11 +618,39 @@ def train_stacking_ensemble(context: AssetExecutionContext,
     
     plt.tight_layout()
     
-    # Save plot to metadata for Dagster UI display
+    # Save plot to buffer
     plot_buffer = BytesIO()
     plt.savefig(plot_buffer, format='png', dpi=150, bbox_inches='tight')
     plot_buffer.seek(0)
     
+    # Save plot to MinIO
+    plot_path = "plots/stacking_ensemble_performance.png"
+    minio_client.put_object(
+        bucket_name,
+        plot_path,
+        plot_buffer,
+        length=plot_buffer.getbuffer().nbytes,
+        content_type="image/png"
+    )
+    context.log.info(f"Saved plot to s3://{bucket_name}/{plot_path}")
+    
+    plot_buffer.seek(0)  # Reset buffer for metadata
+    plt.close()
+    
+    # Also save as best_model.pkl for Streamlit
+    best_model_path = "model/best_model.pkl"
+    best_model_buffer = BytesIO()
+    pickle.dump(model, best_model_buffer)
+    best_model_buffer.seek(0)
+    
+    minio_client.put_object(
+        bucket_name,
+        best_model_path,
+        best_model_buffer,
+        length=best_model_buffer.getbuffer().nbytes,
+        content_type="application/octet-stream"
+    )
+    context.log.info(f"Saved as best model to s3://{bucket_name}/{best_model_path}")
     
     return Output(
         value=model,
@@ -560,7 +658,9 @@ def train_stacking_ensemble(context: AssetExecutionContext,
             "model_type": "StackingEnsemble",
             "base_models": "LogisticRegression, SVM, LightGBM",
             "model_path": f"s3://{bucket_name}/{model_path}",
-            "plot": {"png": plot_buffer.getvalue()},
+            "best_model_path": f"s3://{bucket_name}/{best_model_path}",
+            "plot_path": f"s3://{bucket_name}/plots/stacking_ensemble_performance.png",
+            "plot": MetadataValue.md(f"![Stacking Ensemble Performance](data:image/png;base64,{__import__('base64').b64encode(plot_buffer.getvalue()).decode()})"),
             "train_accuracy": float(train_metrics['accuracy']),
             "train_auc": float(train_metrics['auc']),
             "val_accuracy": float(val_metrics['accuracy']),
