@@ -6,13 +6,13 @@
 
 **An enterprise-grade data engineering and machine learning platform for automated fake news detection**
 
-[🇻🇳 Tiếng Việt](#phiên-bản-tiếng-việt) | [🇬🇧 English](#english-version)
+[🇻🇳 Tiếng Việt](#tiếng-việt) | [🇬🇧 English](#english)
 
 </div>
 
 ---
 
-## English Version
+## English 
 
 ### Table of Contents
 - [Dataset](#dataset)
@@ -494,7 +494,7 @@ Special thanks to Dr. Hà Minh Tân for guidance and mentorship throughout the d
 ---
 ---
 
-## Phiên bản Tiếng Việt
+## Tiếng Việt
 
 ### Mục lục
 - [Bộ dữ liệu](#bộ-dữ-liệu)
