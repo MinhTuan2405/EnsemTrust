@@ -15,6 +15,7 @@
 ## English Version
 
 ### Table of Contents
+- [Dataset](#dataset)
 - [Introduction](#introduction)
 - [Key Features](#key-features)
 - [Architecture](#architecture)
@@ -27,6 +28,16 @@
 - [Running the Project](#running-the-project)
 - [Project Structure](#project-structure)
 - [Development Team](#development-team)
+
+---
+
+### Dataset
+
+This project uses the **Fake News Detection Dataset** from Kaggle:
+
+**Dataset Source:** [Fake News Detection Datasets on Kaggle](https://www.kaggle.com/datasets/emineyetm/fake-news-detection-datasets/data)
+
+The dataset contains news articles labeled as fake or real, which are used to train and evaluate the ensemble machine learning models in this platform.
 
 ---
 
@@ -486,6 +497,7 @@ Special thanks to Dr. Hà Minh Tân for guidance and mentorship throughout the d
 ## Phiên bản Tiếng Việt
 
 ### Mục lục
+- [Bộ dữ liệu](#bộ-dữ-liệu)
 - [Giới thiệu](#giới-thiệu)
 - [Các tính năng chính](#các-tính-năng-chính)
 - [Kiến trúc](#kiến-trúc)
@@ -498,6 +510,16 @@ Special thanks to Dr. Hà Minh Tân for guidance and mentorship throughout the d
 - [Cách chạy dự án](#cách-chạy-dự-án)
 - [Cấu trúc dự án](#cấu-trúc-dự-án)
 - [Nhóm phát triển](#nhóm-phát-triển)
+
+---
+
+### Bộ dữ liệu
+
+Dự án này sử dụng **Bộ dữ liệu phát hiện tin giả (Fake News Detection Dataset)** từ Kaggle:
+
+**Nguồn dữ liệu:** [Fake News Detection Datasets trên Kaggle](https://www.kaggle.com/datasets/emineyetm/fake-news-detection-datasets/data)
+
+Bộ dữ liệu chứa các bài báo được gắn nhãn là tin giả hoặc tin thật, được sử dụng để huấn luyện và đánh giá các mô hình machine learning ensemble trong nền tảng này.
 
 ---
 
